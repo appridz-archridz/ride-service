@@ -1,7 +1,11 @@
 package com.gorap.rideservice.serviceImpl;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,8 +22,12 @@ import com.gorap.rideservice.response.JwtResponse;
 import com.gorap.rideservice.response.UserResponse;
 import com.gorap.rideservice.service.AuthService;
 import com.gorap.rideservice.util.JwtUtils;
+import com.gorap.rideservice.util.ResponseModel;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Slf4j
 public class AuthServiceImpl implements AuthService {
 
     @Autowired
@@ -38,29 +46,56 @@ public class AuthServiceImpl implements AuthService {
      * Authenticate user and generate JWT token
      */
     @Override
-    public JwtResponse authenticateUser(LoginRequest loginRequest) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginRequest.getUsernameOrEmail(),
-                        loginRequest.getPassword()
-                )
-        );
+    public ResponseModel<JwtResponse> authenticateUser(LoginRequest loginRequest) {
+        ResponseModel<JwtResponse> response = new ResponseModel<>();
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            loginRequest.getUsernameOrEmail(),
+                            loginRequest.getPassword()
+                    )
+            );
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+            SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        String jwt = jwtUtils.generateJwtToken(authentication);
+            String jwt = jwtUtils.generateJwtToken(authentication);
 
-        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
-        return new JwtResponse(
-                jwt,
-                userPrincipal.getId(),
-                userPrincipal.getUsername(),
-                userPrincipal.getEmail(),
-                userPrincipal.getPhoneNumber(),
-                userPrincipal.getAddress(),
-                userPrincipal.getUserRole()
-        );
+            UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+
+            JwtResponse jwtResponse = new JwtResponse(
+                    jwt,
+                    userPrincipal.getId(),
+                    userPrincipal.getUsername(),
+                    userPrincipal.getEmail(),
+                    userPrincipal.getPhoneNumber(),
+                    userPrincipal.getAddress(),
+                    userPrincipal.getUserRole()
+            );
+
+            response.setData(jwtResponse);
+            response.setStatusCode(HttpStatus.OK.toString());
+            response.setMessage("User authenticated successfully");
+
+        } catch (BadCredentialsException e) {
+            log.error("Invalid username or password", e);
+            response.setStatusCode(HttpStatus.UNAUTHORIZED.toString());
+            response.setMessage("Invalid username or password");
+        } catch (DisabledException e) {
+            log.error("User account is disabled", e);
+            response.setStatusCode(HttpStatus.FORBIDDEN.toString());
+            response.setMessage("User account is disabled");
+        } catch (LockedException e) {
+            log.error("User account is locked", e);
+            response.setStatusCode(HttpStatus.LOCKED.toString());
+            response.setMessage("User account is locked");
+        } catch (Exception e) {
+            log.error("Authentication error", e);
+            response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.toString());
+            response.setMessage("Authentication failed: " + e.getMessage());
+        }
+        return response;
     }
+
 
     /**
      * Register new user

@@ -20,26 +20,29 @@ import com.gorap.rideservice.response.JwtResponse;
 import com.gorap.rideservice.response.MessageResponse;
 import com.gorap.rideservice.response.UserResponse;
 import com.gorap.rideservice.service.AuthService;
+import com.gorap.rideservice.util.HttpStatusCode;
+import com.gorap.rideservice.util.ResponseModel;
 
 import jakarta.validation.Valid;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/auth")
+@AllArgsConstructor
 public class AuthController {
     
-    @Autowired
-    private AuthService authService;
+   
+    private final AuthService authService;
+    private final HttpStatusCode httpStatusCode;
 
     @PostMapping("/signin")
-    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
-        try {
-            JwtResponse jwtResponse = authService.authenticateUser(loginRequest);
-            return ResponseEntity.ok(jwtResponse);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(new MessageResponse("Invalid username/email or password!", false));
-        }
+    public ResponseEntity<ResponseModel<JwtResponse>> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+
+            ResponseModel<JwtResponse> jwtResponse = authService.authenticateUser(loginRequest);
+            HttpStatus httpStatusFromCode = httpStatusCode.getHttpStatusFromCode(jwtResponse.getStatusCode());
+    		return ResponseEntity.status(httpStatusFromCode).body(jwtResponse);
     }
     
     @PostMapping("/signup")

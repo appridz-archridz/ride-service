@@ -5,10 +5,11 @@ import com.gorap.rideservice.request.LoginRequest;
 import com.gorap.rideservice.request.SignupRequest;
 import com.gorap.rideservice.response.JwtResponse;
 import com.gorap.rideservice.response.UserResponse;
+import com.gorap.rideservice.util.ResponseModel;
 
 public interface AuthService {
 
-	JwtResponse authenticateUser( LoginRequest loginRequest);
+	ResponseModel<JwtResponse> authenticateUser( LoginRequest loginRequest);
 
 	UserResponse registerUser( SignupRequest signUpRequest);
 
