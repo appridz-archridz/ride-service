@@ -101,45 +101,63 @@ public class AuthServiceImpl implements AuthService {
      * Register new user
      */
     @Override
-    public UserResponse registerUser(SignupRequest signUpRequest) {
-     
-        if (userRepository.existsByUserName(signUpRequest.getUserName())) {
-            throw new RuntimeException("Username is already taken!");
+    public ResponseModel<UserResponse> registerUser(SignupRequest signUpRequest) {
+        ResponseModel<UserResponse> response = new ResponseModel<>();
+        try {
+            if (userRepository.existsByUserName(signUpRequest.getUserName())) {
+                response.setStatusCode(HttpStatus.CONFLICT.toString());
+                response.setMessage("Username is already taken!");
+                return response;
+            }
+
+            if (userRepository.existsByEmail(signUpRequest.getEmail())) {
+                response.setStatusCode(HttpStatus.CONFLICT.toString());
+                response.setMessage("Email is already in use!");
+                return response;
+            }
+
+            if (userRepository.existsByPhoneNumber(signUpRequest.getPhoneNumber())) {
+                response.setStatusCode(HttpStatus.CONFLICT.toString());
+                response.setMessage("Phone number is already in use!");
+                return response;
+            }
+
+            // Create new user
+            User user = new User();
+            user.setUserName(signUpRequest.getUserName());
+            user.setEmail(signUpRequest.getEmail());
+            user.setPhoneNumber(signUpRequest.getPhoneNumber());
+            user.setAddress(signUpRequest.getAddress());
+            user.setPassword(passwordEncoder.encode(signUpRequest.getPassword()));
+
+            // Assign role (default USER if not provided)
+            Role role = signUpRequest.getRole() != null ? signUpRequest.getRole() : Role.USER;
+            user.setRole(role);
+
+            // Save to DB
+            User savedUser = userRepository.save(user);
+
+            UserResponse userResponse = new UserResponse(
+                    savedUser.getId(),
+                    savedUser.getUserName(),
+                    savedUser.getEmail(),
+                    savedUser.getPhoneNumber(),
+                    savedUser.getAddress(),
+                    savedUser.getRole()
+            );
+
+            response.setData(userResponse);
+            response.setStatusCode(HttpStatus.CREATED.toString());
+            response.setMessage("User registered successfully");
+
+        } catch (Exception e) {
+            log.error("Error during user registration", e);
+            response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.toString());
+            response.setMessage("Failed to register user: " + e.getMessage());
         }
-
-        if (userRepository.existsByEmail(signUpRequest.getEmail())) {
-            throw new RuntimeException("Email is already in use!");
-        }
-
-        if (userRepository.existsByPhoneNumber(signUpRequest.getPhoneNumber())) {
-            throw new RuntimeException("Phone number is already in use!");
-        }
-
-        // Create new user
-        User user = new User();
-        user.setUserName(signUpRequest.getUserName());
-        user.setEmail(signUpRequest.getEmail());
-        user.setPhoneNumber(signUpRequest.getPhoneNumber());
-        user.setAddress(signUpRequest.getAddress());
-        user.setPassword(passwordEncoder.encode(signUpRequest.getPassword()));
-
-        // Assign role (default USER if not provided)
-        Role role = signUpRequest.getRole() != null ? signUpRequest.getRole() : Role.USER;
-        user.setRole(role);
-
-        // Save to DB
-        User savedUser = userRepository.save(user);
-
-        // Return response
-        return new UserResponse(
-                savedUser.getId(),
-                savedUser.getUserName(),
-                savedUser.getEmail(),
-                savedUser.getPhoneNumber(),
-                savedUser.getAddress(),
-                savedUser.getRole()
-        );
+        return response;
     }
+
 
     @Override
     public boolean existsByEmail(String email) {

@@ -11,7 +11,7 @@ public interface AuthService {
 
 	ResponseModel<JwtResponse> authenticateUser( LoginRequest loginRequest);
 
-	UserResponse registerUser( SignupRequest signUpRequest);
+	ResponseModel<UserResponse> registerUser( SignupRequest signUpRequest);
 
 	String generateTokenForUser(UserPrincipal currentUser);
 
