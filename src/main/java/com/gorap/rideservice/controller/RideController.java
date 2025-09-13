@@ -1,5 +1,6 @@
 package com.gorap.rideservice.controller;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.gorap.rideservice.entity.CreateRide;
 import com.gorap.rideservice.request.RideDTO;
+import com.gorap.rideservice.request.SearchRideDTO;
 import com.gorap.rideservice.service.RideService;
 import com.gorap.rideservice.util.HttpStatusCode;
 import com.gorap.rideservice.util.ResponseModel;
@@ -39,4 +41,15 @@ public class RideController {
         HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
         return ResponseEntity.status(httpStatus).body(response);
     }
+    
+    @PostMapping("/search")
+    public ResponseEntity<ResponseModel<List<CreateRide>>> searchRides(@RequestBody SearchRideDTO searchRideDTO) {
+    	   log.info("Begin RideController -> createRide()");
+           ResponseModel<List<CreateRide>> response = rideService.searchRides(searchRideDTO);
+           log.info("End RideController -> createRide()");
+           HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+           return ResponseEntity.status(httpStatus).body(response);
+    }
+    
+    
 }
