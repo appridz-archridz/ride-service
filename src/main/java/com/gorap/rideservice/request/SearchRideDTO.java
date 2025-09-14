@@ -1,5 +1,7 @@
 package com.gorap.rideservice.request;
 
+import java.time.LocalDate;
+
 import lombok.Data;
 
 @Data
@@ -8,4 +10,5 @@ public class SearchRideDTO {
     private Double sourceLongitude;
     private Double destinationLatitude;
     private Double destinationLongitude;
+    private LocalDate localDate;
 }

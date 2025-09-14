@@ -28,48 +28,422 @@ public class RideServiceImpl implements RideService {
     private final RideRepository rideRepository;
     private final RoutingService routingService;
 
-    // Increased tolerance for intermediate point matching
-    private static final double TOLERANCE_KM = 2.0; // 2km tolerance for better matching
+    // Configuration constants
+    private static final double TOLERANCE_KM = 2.0; // Distance tolerance for route matching
     private static final double STRICT_TOLERANCE_KM = 0.5; // For exact start/end matching
+    private static final double MAX_DETOUR_RATIO = 3.0; // Maximum allowed detour ratio
+    private static final double MIN_TRIP_DISTANCE_KM = 0.5; // Minimum viable trip distance
+    private static final double SEARCH_RADIUS_KM = 50.0; // Search bounding box radius
+    private static final int EARTH_RADIUS_KM = 6371; // Earth radius for Haversine formula
 
     @Override
     @Transactional
     public ResponseModel<CreateRide> createRide(RideDTO rideDTO, UUID userId) {
-        log.info("Begin RideServiceImpl -> createRide()");
+        log.info("Creating ride for user: {}", userId);
         ResponseModel<CreateRide> response = new ResponseModel<>();
+        
         try {
-            // 🔹 Call OSRM online API for polyline + distance
+            // Validate coordinates
+            if (!isValidCoordinates(rideDTO.getStartLatitude(), rideDTO.getStartLongitude()) ||
+                !isValidCoordinates(rideDTO.getDestinationLatitude(), rideDTO.getDestinationLongitude())) {
+                return createErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid coordinates provided");
+            }
+
+            // Validate via points coordinates
+            if (rideDTO.getViaPoints() != null) {
+                for (var viaPoint : rideDTO.getViaPoints()) {
+                    if (!isValidCoordinates(viaPoint.getPickupLatitude(), viaPoint.getPickupLongitude()) ||
+                        !isValidCoordinates(viaPoint.getDropLatitude(), viaPoint.getDropLongitude())) {
+                        return createErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid via point coordinates");
+                    }
+                }
+            }
+
+            // Validate minimum trip distance
+            double tripDistance = haversine(
+                rideDTO.getStartLatitude(), rideDTO.getStartLongitude(),
+                rideDTO.getDestinationLatitude(), rideDTO.getDestinationLongitude()
+            );
+            
+            if (tripDistance < MIN_TRIP_DISTANCE_KM) {
+                return createErrorResponse(response, HttpStatus.BAD_REQUEST, 
+                    String.format("Trip distance too short. Minimum: %.1f km", MIN_TRIP_DISTANCE_KM));
+            }
+
+            // Get route from OSRM
             RoutingService.RouteResult routeResult = routingService.getRoute(
                 rideDTO.getStartLatitude(), rideDTO.getStartLongitude(),
                 rideDTO.getDestinationLatitude(), rideDTO.getDestinationLongitude()
             );
 
-            // 🔹 Map DTO -> Entity
+            if (routeResult == null || routeResult.getPolyline() == null || routeResult.getPolyline().trim().isEmpty()) {
+                log.warn("No route found from OSRM for coordinates: ({},{}) to ({},{})", 
+                    rideDTO.getStartLatitude(), rideDTO.getStartLongitude(),
+                    rideDTO.getDestinationLatitude(), rideDTO.getDestinationLongitude());
+            }
+
+            // Create and save ride
             CreateRide ride = mapToEntity(rideDTO);
-            System.out.println("route"+routeResult.getPolyline());
-            ride.setPolyline(routeResult.getPolyline());
-            ride.setDistanceKm(routeResult.getDistanceKm());
+            ride.setCreatedBy(userId);
+            ride.setPolyline(routeResult != null ? routeResult.getPolyline() : null);
+            ride.setDistanceKm(routeResult != null ? routeResult.getDistanceKm() : tripDistance);
 
             CreateRide saved = rideRepository.save(ride);
 
-            response.setStatusCode(HttpStatus.CREATED.toString());
-            response.setMessage("Ride created successfully.");
+            response.setStatusCode(String.valueOf(HttpStatus.CREATED.value()));
+            response.setMessage("Ride created successfully");
             response.setData(saved);
-
-            log.info("End RideServiceImpl -> createRide()");
+            
+            log.info("Ride created successfully with ID: {} with polyline: {}", 
+                saved.getId(), saved.getPolyline() != null ? "Yes" : "No");
+            
         } catch (Exception e) {
-            log.error("Error in createRide: {}", e.getMessage(), e);
-            response.setStatusCode(String.valueOf(HttpStatus.INTERNAL_SERVER_ERROR.value()));
-            response.setMessage("Failed to create ride: " + e.getMessage());
-            response.setData(null);
+            log.error("Error creating ride: ", e);
+            return createErrorResponse(response, HttpStatus.INTERNAL_SERVER_ERROR, 
+                "Failed to create ride: " + e.getMessage());
         }
+        
         return response;
     }
 
-    // Map RideDTO -> CreateRide entity
+    @Override
+    @Transactional(readOnly = true)
+    public ResponseModel<List<CreateRide>> searchRides(SearchRideDTO searchRideDTO) {
+        log.info("Searching rides from ({},{}) to ({},{})", 
+            searchRideDTO.getSourceLatitude(), searchRideDTO.getSourceLongitude(),
+            searchRideDTO.getDestinationLatitude(), searchRideDTO.getDestinationLongitude());
+        
+        ResponseModel<List<CreateRide>> response = new ResponseModel<>();
+        
+        try {
+            // Validate coordinates
+            if (!isValidCoordinates(searchRideDTO.getSourceLatitude(), searchRideDTO.getSourceLongitude()) ||
+                !isValidCoordinates(searchRideDTO.getDestinationLatitude(), searchRideDTO.getDestinationLongitude())) {
+                return createErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid search coordinates");
+            }
+
+            // FIXED: Calculate expanded bounding box to include all potential rides
+            BoundingBox bbox = calculateExpandedBoundingBox(
+                searchRideDTO.getSourceLatitude(), searchRideDTO.getSourceLongitude(),
+                searchRideDTO.getDestinationLatitude(), searchRideDTO.getDestinationLongitude()
+            );
+
+            log.debug("Search bounding box: ({:.4f},{:.4f}) to ({:.4f},{:.4f})", 
+                bbox.minLat, bbox.minLng, bbox.maxLat, bbox.maxLng);
+
+            // Get candidate rides from database
+            List<CreateRide> candidateRides = rideRepository.findRidesInBoundingBox(
+                bbox.minLat, bbox.maxLat, bbox.minLng, bbox.maxLng,
+                searchRideDTO.getLocalDate()
+            );
+
+            log.debug("Found {} candidate rides in bounding box", candidateRides.size());
+
+            // Filter for exact matches with detailed logging
+            List<CreateRide> matched = candidateRides.stream()
+                .filter(ride -> {
+                    boolean isMatch = isRideMatching(ride, 
+                        searchRideDTO.getSourceLatitude(), searchRideDTO.getSourceLongitude(),
+                        searchRideDTO.getDestinationLatitude(), searchRideDTO.getDestinationLongitude());
+                    
+                    log.debug("Ride {} match result: {}", ride.getId(), isMatch);
+                    return isMatch;
+                })
+                .collect(Collectors.toList());
+
+            response.setStatusCode(String.valueOf(HttpStatus.OK.value()));
+            response.setMessage(String.format("Found %d matching rides", matched.size()));
+            response.setData(matched);
+            
+            log.info("Search completed: {} rides found out of {} candidates", matched.size(), candidateRides.size());
+            
+        } catch (Exception e) {
+            log.error("Error searching rides: ", e);
+            return createErrorResponse(response, HttpStatus.INTERNAL_SERVER_ERROR, 
+                "Failed to search rides: " + e.getMessage());
+        }
+        
+        return response;
+    }
+
+    private boolean isRideMatching(CreateRide ride, double srcLat, double srcLng, double destLat, double destLng) {
+        log.debug("Checking ride {} for matching", ride.getId());
+        
+        // Check exact route match first
+        if (isExactRouteMatch(ride, srcLat, srcLng, destLat, destLng)) {
+            log.debug("Exact route match for ride {}", ride.getId());
+            return true;
+        }
+
+        // Check via points match
+        if (ride.getViaPoints() != null && !ride.getViaPoints().isEmpty()) {
+            if (checkViaPointsMatching(ride.getViaPoints(), srcLat, srcLng, destLat, destLng)) {
+                log.debug("Via points match for ride {}", ride.getId());
+                return true;
+            }
+        }
+
+        // Check polyline match for intermediate routes
+        if (ride.getPolyline() != null && !ride.getPolyline().trim().isEmpty()) {
+            if (isIntermediateRouteMatching(ride, srcLat, srcLng, destLat, destLng)) {
+                log.debug("Intermediate route match for ride {}", ride.getId());
+                return true;
+            }
+        } else {
+            log.debug("No polyline data for ride {}", ride.getId());
+        }
+
+        log.debug("No match found for ride {}", ride.getId());
+        return false;
+    }
+
+    private boolean isExactRouteMatch(CreateRide ride, double srcLat, double srcLng, double destLat, double destLng) {
+        boolean startMatch = isClose(ride.getStartLatitude(), ride.getStartLongitude(), srcLat, srcLng, STRICT_TOLERANCE_KM);
+        boolean endMatch = isClose(ride.getDestinationLatitude(), ride.getDestinationLongitude(), destLat, destLng, STRICT_TOLERANCE_KM);
+        
+        log.debug("Exact route check for ride {}: start={}, end={}", ride.getId(), startMatch, endMatch);
+        
+        return startMatch && endMatch;
+    }
+
+    private boolean isIntermediateRouteMatching(CreateRide ride, double srcLat, double srcLng, double destLat, double destLng) {
+        if (ride.getPolyline() == null || ride.getPolyline().trim().isEmpty()) {
+            log.debug("No polyline data for ride {}", ride.getId());
+            return false;
+        }
+
+        try {
+            List<double[]> routePoints = decodePolyline(ride.getPolyline());
+            if (routePoints.size() < 2) {
+                log.debug("Insufficient polyline points for ride {}: {}", ride.getId(), routePoints.size());
+                return false;
+            }
+
+            log.debug("Decoded {} polyline points for ride {}", routePoints.size(), ride.getId());
+            
+            // DEBUG: Log first, middle, and last points to understand route coverage
+            if (routePoints.size() > 0) {
+                double[] first = routePoints.get(0);
+                double[] last = routePoints.get(routePoints.size() - 1);
+                double[] middle = routePoints.get(routePoints.size() / 2);
+                log.debug("Route sample points - First: ({:.4f},{:.4f}), Middle: ({:.4f},{:.4f}), Last: ({:.4f},{:.4f})", 
+                    first[0], first[1], middle[0], middle[1], last[0], last[1]);
+            }
+
+            // Find closest points on route
+            RouteMatch sourceMatch = findClosestPointOnRoute(routePoints, srcLat, srcLng);
+            RouteMatch destMatch = findClosestPointOnRoute(routePoints, destLat, destLng);
+
+            log.debug("Route matching for ride {}: source={}, dest={}", 
+                ride.getId(), 
+                sourceMatch != null ? String.format("dist=%.3f", sourceMatch.distanceToRoute) : "null",
+                destMatch != null ? String.format("dist=%.3f", destMatch.distanceToRoute) : "null");
+
+            // Validate matches
+            if (sourceMatch == null || sourceMatch.distanceToRoute > TOLERANCE_KM ||
+                destMatch == null || destMatch.distanceToRoute > TOLERANCE_KM) {
+                log.debug("Route points too far from polyline for ride {}", ride.getId());
+                return false;
+            }
+
+            // Check direction (source before destination)
+            if (sourceMatch.routeDistance >= destMatch.routeDistance) {
+                log.debug("Route direction incorrect for ride {} (source: {:.2f}, dest: {:.2f})", 
+                    ride.getId(), sourceMatch.routeDistance, destMatch.routeDistance);
+                return false;
+            }
+
+            // Validate segment distance
+            double segmentDistance = destMatch.routeDistance - sourceMatch.routeDistance;
+            double directDistance = haversine(srcLat, srcLng, destLat, destLng);
+
+            if (segmentDistance < MIN_TRIP_DISTANCE_KM) {
+                log.debug("Segment too short for ride {}: {:.2f}km", ride.getId(), segmentDistance);
+                return false;
+            }
+
+            if (segmentDistance > directDistance * MAX_DETOUR_RATIO) {
+                log.debug("Segment too long for ride {} (segment: {:.2f}km, direct: {:.2f}km, ratio: {:.2f})", 
+                    ride.getId(), segmentDistance, directDistance, segmentDistance / directDistance);
+                return false;
+            }
+
+            log.debug("Polyline match found for ride {} - Segment: {:.2f}km, Direct: {:.2f}km", 
+                ride.getId(), segmentDistance, directDistance);
+            return true;
+
+        } catch (Exception e) {
+            log.error("Error in route matching for ride {}: {}", ride.getId(), e.getMessage(), e);
+            return false;
+        }
+    }
+
+    private RouteMatch findClosestPointOnRoute(List<double[]> routePoints, double lat, double lng) {
+        RouteMatch bestMatch = null;
+        double cumulativeDistance = 0.0;
+        
+        for (int i = 0; i < routePoints.size() - 1; i++) {
+            double[] p1 = routePoints.get(i);
+            double[] p2 = routePoints.get(i + 1);
+            
+            PointProjection projection = projectPointOnSegment(p1, p2, lat, lng);
+            
+            if (projection.distance <= TOLERANCE_KM) {
+                double routeDistanceToPoint = cumulativeDistance + projection.distanceAlongSegment;
+                
+                if (bestMatch == null || projection.distance < bestMatch.distanceToRoute) {
+                    bestMatch = new RouteMatch(i, projection.t, projection.distance, routeDistanceToPoint);
+                }
+            }
+            
+            cumulativeDistance += haversine(p1[0], p1[1], p2[0], p2[1]);
+        }
+        
+        // Check last point
+        double[] lastPoint = routePoints.get(routePoints.size() - 1);
+        double distanceToLast = haversine(lastPoint[0], lastPoint[1], lat, lng);
+        if (distanceToLast <= TOLERANCE_KM) {
+            if (bestMatch == null || distanceToLast < bestMatch.distanceToRoute) {
+                bestMatch = new RouteMatch(routePoints.size() - 1, 1.0, distanceToLast, cumulativeDistance);
+            }
+        }
+        
+        return bestMatch;
+    }
+
+    private PointProjection projectPointOnSegment(double[] p1, double[] p2, double lat, double lng) {
+        double segmentLength = haversine(p1[0], p1[1], p2[0], p2[1]);
+        
+        if (segmentLength < 0.001) { // Less than 1 meter
+            double distance = haversine(p1[0], p1[1], lat, lng);
+            return new PointProjection(0, 0, distance);
+        }
+        
+        double distToP1 = haversine(p1[0], p1[1], lat, lng);
+        double distToP2 = haversine(p2[0], p2[1], lat, lng);
+        
+        // Use law of cosines for more accurate projection
+        double cosAngle = (distToP1 * distToP1 + segmentLength * segmentLength - distToP2 * distToP2) 
+                          / (2 * distToP1 * segmentLength);
+        cosAngle = Math.max(-1, Math.min(1, cosAngle)); // Clamp to valid range
+        
+        double projectionLength = distToP1 * cosAngle;
+        double t = Math.max(0, Math.min(1, projectionLength / segmentLength));
+        
+        // Interpolate position
+        double projLat = p1[0] + t * (p2[0] - p1[0]);
+        double projLng = p1[1] + t * (p2[1] - p1[1]);
+        
+        double distanceToRoute = haversine(projLat, projLng, lat, lng);
+        double distanceAlongSegment = t * segmentLength;
+        
+        return new PointProjection(t, distanceAlongSegment, distanceToRoute);
+    }
+
+    private boolean checkViaPointsMatching(List<ViaPoints> viaPoints, double srcLat, double srcLng, double destLat, double destLng) {
+        log.debug("Checking via points matching for {} via points", viaPoints.size());
+        
+        for (int i = 0; i < viaPoints.size(); i++) {
+            ViaPoints currentVia = viaPoints.get(i);
+            double pickupDist = haversine(currentVia.getPickupLatitude(), currentVia.getPickupLongitude(), srcLat, srcLng);
+            
+            log.debug("Via point {}: pickup distance = {:.3f}km", i, pickupDist);
+            
+            if (pickupDist <= TOLERANCE_KM) {
+                // FIXED: Start from j = i for same via point pickup/drop, or j = i + 1 for different via points
+                for (int j = i; j < viaPoints.size(); j++) {
+                    ViaPoints targetVia = viaPoints.get(j);
+                    double dropDist = haversine(targetVia.getDropLatitude(), targetVia.getDropLongitude(), destLat, destLng);
+                    
+                    log.debug("  Drop point {}: distance = {}km", j, String.format("%.3f", dropDist));
+                    
+                    if (dropDist <= TOLERANCE_KM) {
+                        log.debug("Via points match found: pickup via {} -> drop via {}", i, j);
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        log.debug("No via points match found");
+        return false;
+    }
+
+    private List<double[]> decodePolyline(String encoded) {
+        List<double[]> poly = new java.util.ArrayList<>();
+        
+        if (encoded == null || encoded.trim().isEmpty()) {
+            log.debug("Empty polyline provided");
+            return poly;
+        }
+        
+        try {
+            int index = 0, len = encoded.length();
+            int lat = 0, lng = 0;
+
+            while (index < len) {
+                int b, shift = 0, result = 0;
+                do {
+                    if (index >= len) break;
+                    b = encoded.charAt(index++) - 63;
+                    result |= (b & 0x1f) << shift;
+                    shift += 5;
+                } while (b >= 0x20 && index < len);
+                
+                int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+                lat += dlat;
+
+                shift = 0;
+                result = 0;
+                do {
+                    if (index >= len) break;
+                    b = encoded.charAt(index++) - 63;
+                    result |= (b & 0x1f) << shift;
+                    shift += 5;
+                } while (b >= 0x20 && index < len);
+                
+                int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+                lng += dlng;
+
+                double latitude = lat / 1E5;
+                double longitude = lng / 1E5;
+                
+                if (isValidCoordinates(latitude, longitude)) {
+                    poly.add(new double[]{latitude, longitude});
+                }
+            }
+            
+            // FIXED: Add validation for point density
+            if (poly.size() >= 2) {
+                double totalDistance = 0;
+                for (int i = 0; i < poly.size() - 1; i++) {
+                    totalDistance += haversine(poly.get(i)[0], poly.get(i)[1], 
+                                             poly.get(i+1)[0], poly.get(i+1)[1]);
+                }
+                double avgSegmentLength = totalDistance / (poly.size() - 1);
+                
+                if (avgSegmentLength > 5.0) { // If segments are > 5km apart
+                    log.warn("Polyline points are sparse. Avg segment: {:.2f}km, Total points: {}", 
+                        avgSegmentLength, poly.size());
+                }
+                
+                log.debug("Decoded polyline: {} points, total distance: {:.2f}km, avg segment: {:.2f}km", 
+                    poly.size(), totalDistance, avgSegmentLength);
+            }
+            
+        } catch (Exception e) {
+            log.error("Error decoding polyline: ", e);
+            return new java.util.ArrayList<>();
+        }
+        
+        return poly;
+    }
+
     private CreateRide mapToEntity(RideDTO dto) {
-        List<ViaPoints> viaPoints = dto.getViaPoints() != null ?
-            dto.getViaPoints().stream()
+        List<ViaPoints> viaPoints = null;
+        
+        if (dto.getViaPoints() != null && !dto.getViaPoints().isEmpty()) {
+            viaPoints = dto.getViaPoints().stream()
                 .map(v -> ViaPoints.builder()
                         .pickupLocation(v.getPickupLocation())
                         .pickupLatitude(v.getPickupLatitude())
@@ -78,8 +452,8 @@ public class RideServiceImpl implements RideService {
                         .dropLatitude(v.getDropLatitude())
                         .dropLongitude(v.getDropLongitude())
                         .build())
-                .collect(Collectors.toList())
-            : null;
+                .collect(Collectors.toList());
+        }
 
         return CreateRide.builder()
                 .startPoint(dto.getStartPoint())
@@ -95,284 +469,137 @@ public class RideServiceImpl implements RideService {
                 .build();
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public ResponseModel<List<CreateRide>> searchRides(SearchRideDTO searchRideDTO) {
-        log.info("Begin RideServiceImpl -> searchRides()");
-        ResponseModel<List<CreateRide>> response = new ResponseModel<>();
-        try {
-            List<CreateRide> allRides = rideRepository.findAll();
-
-            List<CreateRide> matched = allRides.stream()
-                .filter(ride -> isRideMatching(
-                        ride,
-                        searchRideDTO.getSourceLatitude(), searchRideDTO.getSourceLongitude(),
-                        searchRideDTO.getDestinationLatitude(), searchRideDTO.getDestinationLongitude()
-                ))
-                .collect(Collectors.toList());
-
-            response.setStatusCode(HttpStatus.OK.toString());
-            response.setMessage("Rides fetched successfully.");
-            response.setData(matched);
-
-            log.info("End RideServiceImpl -> searchRides() - Found {} matching rides", matched.size());
-        } catch (Exception e) {
-            log.error("Error in searchRides: {}", e.getMessage(), e);
-            response.setStatusCode(String.valueOf(HttpStatus.INTERNAL_SERVER_ERROR.value()));
-            response.setMessage("Failed to search rides: " + e.getMessage());
-            response.setData(null);
-        }
-        return response;
+    // FIXED: New method for calculating expanded bounding box
+    private BoundingBox calculateExpandedBoundingBox(double srcLat, double srcLng, double destLat, double destLng) {
+        // Calculate the route distance to determine appropriate search radius
+        double routeDistance = haversine(srcLat, srcLng, destLat, destLng);
+        
+        // Use larger search radius: minimum of SEARCH_RADIUS_KM or route distance + buffer
+        double searchRadius = Math.max(SEARCH_RADIUS_KM, routeDistance + 20.0); // 20km buffer
+        
+        // Find center point of search area
+        double centerLat = (srcLat + destLat) / 2;
+        double centerLng = (srcLng + destLng) / 2;
+        
+        // Calculate bounding box around center point
+        double latOffset = searchRadius / 111.0; // ~111km per degree latitude
+        double avgLat = centerLat;
+        double lngOffset = searchRadius / (111.0 * Math.cos(Math.toRadians(avgLat)));
+        
+        double minLat = centerLat - latOffset;
+        double maxLat = centerLat + latOffset;
+        double minLng = centerLng - lngOffset;
+        double maxLng = centerLng + lngOffset;
+        
+        log.debug("Expanded bounding box calculation: route distance={:.2f}km, search radius={:.2f}km", 
+            routeDistance, searchRadius);
+        
+        return new BoundingBox(minLat, maxLat, minLng, maxLng);
     }
 
-    /**
-     * ✅ Enhanced matching logic for intermediate routes
-     */
-    private boolean isRideMatching(CreateRide ride,
-                                   double srcLat, double srcLng,
-                                   double destLat, double destLng) {
+    // DEPRECATED: Keep original method for reference, but not used
+    private BoundingBox calculateBoundingBox(double lat1, double lng1, double lat2, double lng2) {
+        double minLat = Math.min(lat1, lat2) - (SEARCH_RADIUS_KM / 111.0);
+        double maxLat = Math.max(lat1, lat2) + (SEARCH_RADIUS_KM / 111.0);
+        double avgLat = (minLat + maxLat) / 2;
+        double lngOffset = SEARCH_RADIUS_KM / (111.0 * Math.cos(Math.toRadians(avgLat)));
+        double minLng = Math.min(lng1, lng2) - lngOffset;
+        double maxLng = Math.max(lng1, lng2) + lngOffset;
         
-        log.debug("Checking ride from {} to {} against search from ({},{}) to ({},{})", 
-            ride.getStartPoint(), ride.getDestinationPoint(), srcLat, srcLng, destLat, destLng);
-        
-        // 1. First check if it's an exact route match (start to end)
-        if (isClose(ride.getStartLatitude(), ride.getStartLongitude(), srcLat, srcLng, STRICT_TOLERANCE_KM)
-                && isClose(ride.getDestinationLatitude(), ride.getDestinationLongitude(), destLat, destLng, STRICT_TOLERANCE_KM)) {
-            log.debug("Exact route match found");
-            return true;
-        }
-
-        // 2. Check viaPoints if available (for explicit intermediate stops)
-        if (ride.getViaPoints() != null && !ride.getViaPoints().isEmpty()) {
-            if (checkViaPointsMatching(ride.getViaPoints(), srcLat, srcLng, destLat, destLng)) {
-                log.debug("Via points match found");
-                return true;
-            }
-        }
-
-        // 3. ✅ MAIN FIX: Enhanced polyline matching for intermediate routes
-        if (ride.getPolyline() != null) {
-            boolean polylineMatch = isIntermediateRouteMatching(ride, srcLat, srcLng, destLat, destLng);
-            if (polylineMatch) {
-                log.debug("Intermediate route match found via polyline");
-                return true;
-            }
-        }
-
-        return false;
+        return new BoundingBox(minLat, maxLat, minLng, maxLng);
     }
 
-    /**
-     * ✅ NEW METHOD: Enhanced intermediate route matching
-     */
-    private boolean isIntermediateRouteMatching(CreateRide ride, double srcLat, double srcLng, double destLat, double destLng) {
-        if (ride.getPolyline() == null) return false;
-
-        try {
-            // Get the route polyline points
-            List<double[]> routePoints = decodePolyline(ride.getPolyline());
-            if (routePoints.isEmpty()) return false;
-
-            // Find the closest points on the route to source and destination
-            PointMatch sourceMatch = findClosestPointOnRoute(routePoints, srcLat, srcLng);
-            PointMatch destMatch = findClosestPointOnRoute(routePoints, destLat, destLng);
-
-            // Check if both points are close enough to the route
-            if (sourceMatch == null || destMatch == null) {
-                log.debug("Source or destination not close enough to route. Source match: {}, Dest match: {}", 
-                    sourceMatch != null, destMatch != null);
-                return false;
-            }
-
-            // Check if source comes before destination in the route
-            if (sourceMatch.index >= destMatch.index) {
-                log.debug("Source point comes after destination point in route. Source index: {}, Dest index: {}", 
-                    sourceMatch.index, destMatch.index);
-                return false;
-            }
-
-            // ✅ Additional validation: Check if the segment makes sense
-            double segmentDistance = calculateRouteDistance(routePoints, sourceMatch.index, destMatch.index);
-            double directDistance = haversine(srcLat, srcLng, destLat, destLng);
-            
-            // If route segment is too much longer than direct distance, it might not be a good match
-            if (segmentDistance > directDistance * 3) { // Allow up to 3x detour
-                log.debug("Route segment too long compared to direct distance. Segment: {}km, Direct: {}km", 
-                    segmentDistance, directDistance);
-                return false;
-            }
-
-            log.debug("✅ Intermediate route match: Source at index {}, Dest at index {}, Segment distance: {}km", 
-                sourceMatch.index, destMatch.index, segmentDistance);
-            return true;
-
-        } catch (Exception e) {
-            log.error("Error in intermediate route matching: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Helper class to store point match information
-     */
-    private static class PointMatch {
-        int index;
-        double distance;
+    // ADDED: Method for calculating bounding box around existing ride (for future use)
+    private BoundingBox calculateBoundingBoxForRide(CreateRide ride, double searchRadius) {
+        // Include ride's start, end, AND all via points in bounding box
+        double minLat = Math.min(ride.getStartLatitude(), ride.getDestinationLatitude());
+        double maxLat = Math.max(ride.getStartLatitude(), ride.getDestinationLatitude());
+        double minLng = Math.min(ride.getStartLongitude(), ride.getDestinationLongitude());
+        double maxLng = Math.max(ride.getStartLongitude(), ride.getDestinationLongitude());
         
-        PointMatch(int index, double distance) {
-            this.index = index;
-            this.distance = distance;
-        }
-    }
-
-    /**
-     * Find the closest point on the route to given coordinates
-     * Enhanced to handle any location along the route
-     */
-    private PointMatch findClosestPointOnRoute(List<double[]> routePoints, double lat, double lng) {
-        PointMatch closest = null;
-        
-        // Also check interpolated points between polyline points for better accuracy
-        for (int i = 0; i < routePoints.size(); i++) {
-            double[] point = routePoints.get(i);
-            double distance = haversine(point[0], point[1], lat, lng);
-            
-            if (distance <= TOLERANCE_KM) { // Within acceptable tolerance
-                if (closest == null || distance < closest.distance) {
-                    closest = new PointMatch(i, distance);
-                }
-            }
-            
-            // ✅ NEW: Check interpolated points between consecutive route points
-            if (i < routePoints.size() - 1) {
-                PointMatch interpolatedMatch = findClosestOnSegment(
-                    routePoints.get(i), routePoints.get(i + 1), lat, lng, i
-                );
-                if (interpolatedMatch != null && 
-                    (closest == null || interpolatedMatch.distance < closest.distance)) {
-                    closest = interpolatedMatch;
-                }
+        // Include via points
+        if (ride.getViaPoints() != null) {
+            for (ViaPoints via : ride.getViaPoints()) {
+                minLat = Math.min(minLat, Math.min(via.getPickupLatitude(), via.getDropLatitude()));
+                maxLat = Math.max(maxLat, Math.max(via.getPickupLatitude(), via.getDropLatitude()));
+                minLng = Math.min(minLng, Math.min(via.getPickupLongitude(), via.getDropLongitude()));
+                maxLng = Math.max(maxLng, Math.max(via.getPickupLongitude(), via.getDropLongitude()));
             }
         }
         
-        return closest;
-    }
-    
-    /**
-     * Find closest point on a line segment between two polyline points
-     */
-    private PointMatch findClosestOnSegment(double[] point1, double[] point2, 
-                                          double searchLat, double searchLng, int segmentIndex) {
-        // Vector from point1 to point2
-        double dx = point2[1] - point1[1]; // longitude difference
-        double dy = point2[0] - point1[0]; // latitude difference
+        // Add search radius
+        double latOffset = searchRadius / 111.0;
+        double avgLat = (minLat + maxLat) / 2;
+        double lngOffset = searchRadius / (111.0 * Math.cos(Math.toRadians(avgLat)));
         
-        if (dx == 0 && dy == 0) {
-            // Points are the same
-            double distance = haversine(point1[0], point1[1], searchLat, searchLng);
-            return distance <= TOLERANCE_KM ? new PointMatch(segmentIndex, distance) : null;
-        }
-        
-        // Calculate projection parameter
-        double t = ((searchLng - point1[1]) * dx + (searchLat - point1[0]) * dy) / (dx * dx + dy * dy);
-        
-        // Clamp t to [0, 1] to stay on segment
-        t = Math.max(0, Math.min(1, t));
-        
-        // Find closest point on segment
-        double closestLat = point1[0] + t * dy;
-        double closestLng = point1[1] + t * dx;
-        
-        double distance = haversine(closestLat, closestLng, searchLat, searchLng);
-        
-        return distance <= TOLERANCE_KM ? 
-            new PointMatch(segmentIndex + (int)(t * 1000), distance) : null; // Use fractional index
+        return new BoundingBox(minLat - latOffset, maxLat + latOffset, 
+                              minLng - lngOffset, maxLng + lngOffset);
     }
 
-    /**
-     * Calculate distance along the route between two point indices
-     */
-    private double calculateRouteDistance(List<double[]> points, int startIndex, int endIndex) {
-        double distance = 0.0;
-        for (int i = startIndex; i < endIndex && i < points.size() - 1; i++) {
-            distance += haversine(points.get(i)[0], points.get(i)[1], 
-                                points.get(i + 1)[0], points.get(i + 1)[1]);
-        }
-        return distance;
+    private boolean isValidCoordinates(double lat, double lng) {
+        return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
     }
 
-    /**
-     * Check via points matching
-     */
-    private boolean checkViaPointsMatching(List<ViaPoints> viaPoints, double srcLat, double srcLng, double destLat, double destLng) {
-        boolean foundSource = false;
-        
-        for (ViaPoints vp : viaPoints) {
-            // Check if this via point matches our source
-            if (!foundSource && isClose(vp.getPickupLatitude(), vp.getPickupLongitude(), srcLat, srcLng, TOLERANCE_KM)) {
-                foundSource = true;
-            }
-            // If we found source, check if this via point matches our destination
-            else if (foundSource && isClose(vp.getDropLatitude(), vp.getDropLongitude(), destLat, destLng, TOLERANCE_KM)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * ✅ Lightweight polyline decoder (no external library)
-     */
-    private List<double[]> decodePolyline(String encoded) {
-        List<double[]> poly = new java.util.ArrayList<>();
-        int index = 0, len = encoded.length();
-        int lat = 0, lng = 0;
-
-        while (index < len) {
-            int b, shift = 0, result = 0;
-            do {
-                b = encoded.charAt(index++) - 63;
-                result |= (b & 0x1f) << shift;
-                shift += 5;
-            } while (b >= 0x20);
-            int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-            lat += dlat;
-
-            shift = 0;
-            result = 0;
-            do {
-                b = encoded.charAt(index++) - 63;
-                result |= (b & 0x1f) << shift;
-                shift += 5;
-            } while (b >= 0x20);
-            int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-            lng += dlng;
-
-            double latitude = lat / 1E5;
-            double longitude = lng / 1E5;
-            poly.add(new double[]{latitude, longitude});
-        }
-        return poly;
-    }
-
-    // Overloaded method with custom tolerance
     private boolean isClose(double lat1, double lon1, double lat2, double lon2, double toleranceKm) {
-        double distance = haversine(lat1, lon1, lat2, lon2);
-        return distance <= toleranceKm;
-    }
-
-    // Original method with default tolerance
-    private boolean isClose(double lat1, double lon1, double lat2, double lon2) {
-        return isClose(lat1, lon1, lat2, lon2, TOLERANCE_KM);
+        return haversine(lat1, lon1, lat2, lon2) <= toleranceKm;
     }
 
     private double haversine(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371; // km
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
                 * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    private <T> ResponseModel<T> createErrorResponse(ResponseModel<T> response, HttpStatus status, String message) {
+        response.setStatusCode(String.valueOf(status.value()));
+        response.setMessage(message);
+        response.setData(null);
+        return response;
+    }
+
+    // Inner classes
+    private static class RouteMatch {
+        final int pointIndex;
+        final double segmentRatio;
+        final double distanceToRoute;
+        final double routeDistance;
+        
+        RouteMatch(int pointIndex, double segmentRatio, double distanceToRoute, double routeDistance) {
+            this.pointIndex = pointIndex;
+            this.segmentRatio = segmentRatio;
+            this.distanceToRoute = distanceToRoute;
+            this.routeDistance = routeDistance;
+        }
+    }
+
+    private static class PointProjection {
+        final double t;
+        final double distanceAlongSegment;
+        final double distance;
+        
+        PointProjection(double t, double distanceAlongSegment, double distance) {
+            this.t = t;
+            this.distanceAlongSegment = distanceAlongSegment;
+            this.distance = distance;
+        }
+    }
+
+    private static class BoundingBox {
+        final double minLat, maxLat, minLng, maxLng;
+        
+        BoundingBox(double minLat, double maxLat, double minLng, double maxLng) {
+            this.minLat = minLat;
+            this.maxLat = maxLat;
+            this.minLng = minLng;
+            this.maxLng = maxLng;
+        }
+        
+        @Override
+        public String toString() {
+            return String.format("BoundingBox[(%f,%f) to (%f,%f)]", minLat, minLng, maxLat, maxLng);
+        }
     }
 }
