@@ -104,23 +104,23 @@ public class AuthServiceImpl implements AuthService {
     public ResponseModel<UserResponse> registerUser(SignupRequest signUpRequest) {
         ResponseModel<UserResponse> response = new ResponseModel<>();
         try {
-            if (userRepository.existsByUserName(signUpRequest.getUserName())) {
-                response.setStatusCode(HttpStatus.CONFLICT.toString());
-                response.setMessage("Username is already taken!");
-                return response;
-            }
-
-            if (userRepository.existsByEmail(signUpRequest.getEmail())) {
-                response.setStatusCode(HttpStatus.CONFLICT.toString());
-                response.setMessage("Email is already in use!");
-                return response;
-            }
-
-            if (userRepository.existsByPhoneNumber(signUpRequest.getPhoneNumber())) {
-                response.setStatusCode(HttpStatus.CONFLICT.toString());
-                response.setMessage("Phone number is already in use!");
-                return response;
-            }
+//            if (userRepository.existsByUserName(signUpRequest.getUserName())) {
+//                response.setStatusCode(HttpStatus.CONFLICT.toString());
+//                response.setMessage("Username is already taken!");
+//                return response;
+//            }
+//
+//            if (userRepository.existsByEmail(signUpRequest.getEmail())) {
+//                response.setStatusCode(HttpStatus.CONFLICT.toString());
+//                response.setMessage("Email is already in use!");
+//                return response;
+//            }
+//
+//            if (userRepository.existsByPhoneNumber(signUpRequest.getPhoneNumber())) {
+//                response.setStatusCode(HttpStatus.CONFLICT.toString());
+//                response.setMessage("Phone number is already in use!");
+//                return response;
+//            }
 
             // Create new user
             User user = new User();
@@ -129,6 +129,7 @@ public class AuthServiceImpl implements AuthService {
             user.setPhoneNumber(signUpRequest.getPhoneNumber());
             user.setAddress(signUpRequest.getAddress());
             user.setPassword(passwordEncoder.encode(signUpRequest.getPassword()));
+            user.setDeviceName(signUpRequest.getDeviceName());
 
             // Assign role (default USER if not provided)
             Role role = signUpRequest.getRole() != null ? signUpRequest.getRole() : Role.USER;
