@@ -39,6 +39,8 @@ public class User {
     @Column(name="email")
     private String email;
     
+    @Column(name = "deviceName")
+    private String deviceName;
     
     @Column(name="role")
     @Enumerated(EnumType.STRING)
