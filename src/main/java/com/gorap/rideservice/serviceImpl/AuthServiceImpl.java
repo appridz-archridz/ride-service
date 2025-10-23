@@ -1,5 +1,7 @@
 package com.gorap.rideservice.serviceImpl;
 
+import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -73,6 +75,7 @@ public class AuthServiceImpl implements AuthService {
             );
 
             response.setData(jwtResponse);
+            response.setSuccess(true);
             response.setStatusCode(HttpStatus.OK.toString());
             response.setMessage("User authenticated successfully");
 
@@ -92,7 +95,9 @@ public class AuthServiceImpl implements AuthService {
             log.error("Authentication error", e);
             response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.toString());
             response.setMessage("Authentication failed: " + e.getMessage());
-        }
+        } finally {
+			response.setSuccess(false);
+		}
         return response;
     }
 
@@ -104,23 +109,23 @@ public class AuthServiceImpl implements AuthService {
     public ResponseModel<UserResponse> registerUser(SignupRequest signUpRequest) {
         ResponseModel<UserResponse> response = new ResponseModel<>();
         try {
-//            if (userRepository.existsByUserName(signUpRequest.getUserName())) {
-//                response.setStatusCode(HttpStatus.CONFLICT.toString());
-//                response.setMessage("Username is already taken!");
-//                return response;
-//            }
-//
-//            if (userRepository.existsByEmail(signUpRequest.getEmail())) {
-//                response.setStatusCode(HttpStatus.CONFLICT.toString());
-//                response.setMessage("Email is already in use!");
-//                return response;
-//            }
-//
-//            if (userRepository.existsByPhoneNumber(signUpRequest.getPhoneNumber())) {
-//                response.setStatusCode(HttpStatus.CONFLICT.toString());
-//                response.setMessage("Phone number is already in use!");
-//                return response;
-//            }
+            if (userRepository.existsByUserName(signUpRequest.getUserName())) {
+                response.setStatusCode(HttpStatus.CONFLICT.toString());
+                response.setMessage("Username is already taken!");
+                return response;
+            }
+
+            if (userRepository.existsByEmail(signUpRequest.getEmail())) {
+                response.setStatusCode(HttpStatus.CONFLICT.toString());
+                response.setMessage("Email is already in use!");
+                return response;
+            }
+
+            if (userRepository.existsByPhoneNumber(signUpRequest.getPhoneNumber())) {
+                response.setStatusCode(HttpStatus.CONFLICT.toString());
+                response.setMessage("Phone number is already in use!");
+                return response;
+            }
 
             // Create new user
             User user = new User();
@@ -130,6 +135,7 @@ public class AuthServiceImpl implements AuthService {
             user.setAddress(signUpRequest.getAddress());
             user.setPassword(passwordEncoder.encode(signUpRequest.getPassword()));
             user.setDeviceName(signUpRequest.getDeviceName());
+            user.setProfilePic(signUpRequest.getProfilePic());
 
             // Assign role (default USER if not provided)
             Role role = signUpRequest.getRole() != null ? signUpRequest.getRole() : Role.USER;
@@ -148,15 +154,26 @@ public class AuthServiceImpl implements AuthService {
             );
 
             response.setData(userResponse);
+            response.setSuccess(true);
             response.setStatusCode(HttpStatus.CREATED.toString());
             response.setMessage("User registered successfully");
 
         } catch (Exception e) {
             log.error("Error during user registration", e);
+            response.setSuccess(false);
             response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.toString());
             response.setMessage("Failed to register user: " + e.getMessage());
         }
         return response;
+    }
+    
+    @Override
+    public ResponseModel<SignupRequest> getProfileDetails(UUID userId) {
+    	try {
+    		User userDetails = userRepository.getById(userId);
+    	} catch (Exception e) {
+    		
+    	}
     }
 
 
