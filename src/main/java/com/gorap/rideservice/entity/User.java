@@ -58,5 +58,8 @@ public class User {
     
     @Column(name = "modified_on")
     private Timestamp modifiedOn;
+    
+    @Column(name = "profile_pic")
+    private String profilePic;
 
 }

@@ -19,7 +19,9 @@ public class SignupRequest {
 
     private String phoneNumber;
     
-    private String address; // Optional field
+    private String address;
+    
+    private String profilePic;
     
     private Role role = Role.USER; // Default role is USER, can be changed for driver registration
 }
