@@ -37,7 +37,6 @@ public class AuthController {
 
 	@PostMapping("/signin")
 	public ResponseEntity<ResponseModel<JwtResponse>> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
-
 		ResponseModel<JwtResponse> jwtResponse = authService.authenticateUser(loginRequest);
 		HttpStatus httpStatusFromCode = httpStatusCode.getHttpStatusFromCode(jwtResponse.getStatusCode());
 		return ResponseEntity.status(httpStatusFromCode).body(jwtResponse);
@@ -121,4 +120,5 @@ public class AuthController {
 					.body(new MessageResponse("Error refreshing token!", false));
 		}
 	}
+	
 }

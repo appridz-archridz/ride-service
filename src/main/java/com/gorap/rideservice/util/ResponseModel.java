@@ -14,7 +14,10 @@ public class ResponseModel<T> {
     private String statusCode;
 
     private String message;
+    
+    private boolean success; 
 
     private T data;
+    
     
 }

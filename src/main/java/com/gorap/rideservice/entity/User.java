@@ -39,6 +39,8 @@ public class User {
     @Column(name="email")
     private String email;
     
+    @Column(name = "deviceName")
+    private String deviceName;
     
     @Column(name="role")
     @Enumerated(EnumType.STRING)
@@ -56,5 +58,8 @@ public class User {
     
     @Column(name = "modified_on")
     private Timestamp modifiedOn;
+    
+    @Column(name = "profile_pic")
+    private String profilePic;
 
 }

@@ -1,5 +1,7 @@
 package com.gorap.rideservice.service;
 
+import java.util.UUID;
+
 import com.gorap.rideservice.auth.UserPrincipal;
 import com.gorap.rideservice.request.LoginRequest;
 import com.gorap.rideservice.request.SignupRequest;
@@ -18,5 +20,9 @@ public interface AuthService {
 	boolean existsByPhoneNumber(String phoneNumber);
 
 	boolean existsByEmail(String email);
+	
+	ResponseModel<SignupRequest> getProfileDetails(UUID userId);
+	
+	
 
 }
