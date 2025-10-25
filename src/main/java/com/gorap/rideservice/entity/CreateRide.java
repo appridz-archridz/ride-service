@@ -22,7 +22,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "create_ride")
+@Table(name = "create_ride",schema="ride")
 public class CreateRide extends BaseEntity {
 
     private String startPoint;
