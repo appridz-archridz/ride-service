@@ -29,4 +29,20 @@ public interface RideRepository extends JpaRepository<CreateRide, UUID> {
 	    @Param("maxLng") double maxLng,
 	    @Param("rideDate") LocalDate rideDate
 	);
+	
+	@Query(value = "SELECT * FROM create_ride " +
+            "WHERE start_latitude = :sourceLat " +
+            "AND start_longitude = :sourceLng " +
+            "AND destination_latitude = :destinationLat " +
+            "AND destination_longitude = :destinationLng",
+	    nativeQuery = true)
+	List<CreateRide> findExactRides(
+	 @Param("sourceLat") Double sourceLat,
+	 @Param("sourceLng") Double sourceLng,
+	 @Param("destinationLat") Double destinationLat,
+	 @Param("destinationLng") Double destinationLng
+	);
+
+
+	
 }

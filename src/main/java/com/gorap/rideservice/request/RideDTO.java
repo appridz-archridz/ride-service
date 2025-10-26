@@ -30,6 +30,8 @@ public class RideDTO {
     private LocalTime rideTime;
 
     private Integer availableSeats;
+    
+    private String polyline;
 
     private List<ViaPointDTO> viaPoints;
 }
