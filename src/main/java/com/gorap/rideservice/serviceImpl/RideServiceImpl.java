@@ -1,5 +1,6 @@
 package com.gorap.rideservice.serviceImpl;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -153,43 +154,44 @@ public class RideServiceImpl implements RideService {
             log.debug("Search bounding box: ({:.4f},{:.4f}) to ({:.4f},{:.4f})", 
                 bbox.minLat, bbox.minLng, bbox.maxLat, bbox.maxLng);
 
-            System.out.println(	searchRideDTO.getSourceLatitude() + " " + 
-            		searchRideDTO.getSourceLongitude() + " " +
-            		searchRideDTO.getDestinationLatitude() + " " +
-            		searchRideDTO.getDestinationLongitude());
             // Get candidate rides from database
-            List<CreateRide> candidateRides = rideRepository.findExactRides(
-            		searchRideDTO.getSourceLatitude(), 
-            		searchRideDTO.getSourceLongitude(),
-            		searchRideDTO.getDestinationLatitude(),
-            		searchRideDTO.getDestinationLongitude()
-//            		searchRideDTO.getLocalDate()
-            		);
+            List<CreateRide> candidateExactRides = rideRepository.findExactRides(
+            	    searchRideDTO.getSourceLatitude(), 
+            	    searchRideDTO.getSourceLongitude(),
+            	    searchRideDTO.getDestinationLatitude(),
+            	    searchRideDTO.getDestinationLongitude()
+            	    // searchRideDTO.getLocalDate()
+            	);
 
-            log.debug("Found {} candidate rides in bounding box", candidateRides.size());
+            	List<CreateRide> allRides = rideRepository.findMiddleRides(
+            	    // searchRideDTO.getLocalDate()
+            	); 
+
+            	List<CreateRide> candidateMiddleRides = new ArrayList<>();
+            	
+
+            	for (CreateRide ride : allRides) {
+            	    String polyline = ride.getPolyline();
+
+            	    boolean isRideMatch =  isRouteMatching(polyline, searchRideDTO.getSourceLatitude(), searchRideDTO.getSourceLongitude(), searchRideDTO.getDestinationLatitude(), searchRideDTO.getDestinationLongitude());
+            	    
+	            	if (isRideMatch) {
+	            		System.out.println("start (lat, lng)  " + searchRideDTO.getSourceLatitude() + " " + searchRideDTO.getSourceLongitude());
+	            		System.out.println("end (lat, lng)  " + searchRideDTO.getDestinationLatitude() + " " + searchRideDTO.getDestinationLongitude());
+	            		System.out.println("polyline " + polyline);
+	            		System.out.println("isRidMatch - " + ride.getStartPoint() + " " + isRideMatch);
+	            		candidateMiddleRides.add(ride);
+	            	}
+            	}
+            	List<CreateRide> candidateRides = new ArrayList<>(candidateExactRides);
+            	candidateRides.addAll(candidateMiddleRides);
             
+            log.debug("Found {} candidate rides in bounding box", candidateRides.size());
+            System.out.println(candidateMiddleRides.size());
             response.setSuccess(true);
             response.setStatusCode(String.valueOf(HttpStatus.OK.value()));
             response.setMessage(String.format("Found %d matching rides", candidateRides.size()));
-            response.setData(candidateRides);
-
-            // Filter for exact matches with detailed logging
-//            List<CreateRide> matched = candidateRides.stream()
-//                .filter(ride -> {
-//                    boolean isMatch = isRideMatching(ride, 
-//                        searchRideDTO.getSourceLatitude(), searchRideDTO.getSourceLongitude(),
-//                        searchRideDTO.getDestinationLatitude(), searchRideDTO.getDestinationLongitude());
-//                    
-//                    log.debug("Ride {} match result: {}", ride.getId(), isMatch);
-//                    return isMatch;
-//                })
-//                .collect(Collectors.toList());
-//
-//            response.setStatusCode(String.valueOf(HttpStatus.OK.value()));
-//            response.setMessage(String.format("Found %d matching rides", matched.size()));
-//            response.setData(matched);
-            
-//            log.info("Search completed: {} rides found out of {} candidates", matched.size(), candidateRides.size());
+            response.setData(candidateMiddleRides);
             
         } catch (Exception e) {
             log.error("Error searching rides: ", e);
@@ -199,6 +201,35 @@ public class RideServiceImpl implements RideService {
         
         return response;
     }
+    
+    public static boolean isRouteMatching(String polyline, double startLat, double startLng, double endLat, double endLng) {
+        String[] points = polyline.split(";");
+        boolean sourceFound = false;
+        double tolerance = 0.00050; // roughly ~55 meters
+
+        for (String point : points) {
+            String[] latLng = point.split(",");
+            if (latLng.length != 2) continue; // skip invalid points
+
+            double lat = Double.parseDouble(latLng[0]);
+            double lng = Double.parseDouble(latLng[1]);
+
+            if (!sourceFound) {
+                // Check for start point match
+                if (Math.abs(startLat - lat) <= tolerance && Math.abs(startLng - lng) <= tolerance) {
+                    sourceFound = true;
+                }
+            } else {
+                // After source found, check for end point match
+                if (Math.abs(endLat - lat) <= tolerance && Math.abs(endLng - lng) <= tolerance) {
+                    return true; // both start and end found in correct order
+                }
+            }
+        }
+
+        return false; // no full match found
+    }
+
 
     private boolean isRideMatching(CreateRide ride, double srcLat, double srcLng, double destLat, double destLng) {
         log.debug("Checking ride {} for matching", ride.getId());
