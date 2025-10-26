@@ -43,6 +43,8 @@ public interface RideRepository extends JpaRepository<CreateRide, UUID> {
 	 @Param("destinationLng") Double destinationLng
 	);
 
-
+	@Query(value = "SELECT * FROM create_ride",
+	    nativeQuery = true)
+	List<CreateRide> findMiddleRides();
 	
 }
