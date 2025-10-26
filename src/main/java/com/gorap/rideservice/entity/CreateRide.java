@@ -2,7 +2,9 @@ package com.gorap.rideservice.entity;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
@@ -39,7 +41,7 @@ public class CreateRide extends BaseEntity {
     private Integer availableSeats;
 
     @Lob
-    private String polyline;  // Encoded polyline geometry
+    private String polyline;
 
     private Double distanceKm; // Distance in km from OSRM
 

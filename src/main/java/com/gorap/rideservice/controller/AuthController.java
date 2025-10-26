@@ -44,6 +44,7 @@ public class AuthController {
 
 	@PostMapping("/signup")
 	public ResponseEntity<ResponseModel<UserResponse>> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
+ 	   	log.info("Begin AuthController -> registerUser()");
 		ResponseModel<UserResponse> userResponse = authService.registerUser(signUpRequest);
 		HttpStatus httpStatusFromCode = httpStatusCode.getHttpStatusFromCode(userResponse.getStatusCode());
 		return ResponseEntity.status(httpStatusFromCode).body(userResponse);
