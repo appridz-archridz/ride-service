@@ -18,6 +18,7 @@ import com.gorap.rideservice.entity.CreateRide;
 import com.gorap.rideservice.repository.RideRepository;
 import com.gorap.rideservice.request.RideDTO;
 import com.gorap.rideservice.request.SearchRideDTO;
+import com.gorap.rideservice.response.RideDetailsProjection;
 import com.gorap.rideservice.service.RideService;
 import com.gorap.rideservice.util.HttpStatusCode;
 import com.gorap.rideservice.util.ResponseModel;
@@ -70,6 +71,17 @@ public class RideController {
         
         return ResponseEntity.ok(debug);
     }
+    
+    @GetMapping("/get/{rideId}")
+    public ResponseEntity<ResponseModel<RideDetailsProjection>> getRideDetails(@PathVariable UUID rideId) {
+        log.info("Begin RideController -> getRideDetails()");
+        ResponseModel<RideDetailsProjection> response = rideService.getRideDetails(rideId);
+        HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+        log.info("End RideController -> getRideDetails()");
+        return ResponseEntity.status(httpStatus).body(response);
+    }
+    
+
     
     
 }
