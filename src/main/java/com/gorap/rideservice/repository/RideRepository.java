@@ -63,6 +63,8 @@ public interface RideRepository extends JpaRepository<CreateRide, UUID> {
         """, nativeQuery = true)
         Optional<RideDetailsProjection> findRideDetailsById(UUID rideId);
 
-
+	@Query(value = "SELECT * FROM create_ride",
+	    nativeQuery = true)
+	List<CreateRide> findMiddleRides();
 	
 }
