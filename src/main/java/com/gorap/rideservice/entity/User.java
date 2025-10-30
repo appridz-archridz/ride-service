@@ -61,5 +61,8 @@ public class User {
     
     @Column(name = "profile_pic")
     private String profilePic;
+    
+    @Column(name="otp")
+    private String otp;
 
 }

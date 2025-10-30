@@ -1,5 +1,8 @@
 package com.gorap.rideservice.serviceImpl;
 
+import java.sql.Timestamp;
+import java.util.Optional;
+import java.util.Random;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +26,7 @@ import com.gorap.rideservice.request.SignupRequest;
 import com.gorap.rideservice.response.JwtResponse;
 import com.gorap.rideservice.response.UserResponse;
 import com.gorap.rideservice.service.AuthService;
+import com.gorap.rideservice.util.EmailService;
 import com.gorap.rideservice.util.JwtUtils;
 import com.gorap.rideservice.util.ResponseModel;
 
@@ -43,6 +47,9 @@ public class AuthServiceImpl implements AuthService {
 
     @Autowired
     private JwtUtils jwtUtils;
+    
+    @Autowired
+    private EmailService emailService;
 
     /**
      * Authenticate user and generate JWT token
@@ -250,4 +257,92 @@ public class AuthServiceImpl implements AuthService {
     public String generateTokenForUser(UserPrincipal userPrincipal) {
         return jwtUtils.generateTokenFromUsername(userPrincipal.getUsername());
     }
+
+
+	@Override
+	public void forgotPassword(String email) {
+		try {
+			
+			 Optional<User> userOpt = userRepository.findByEmail(email);
+		        if (userOpt.isEmpty()) {
+		            throw new RuntimeException("User not found with email: " + email);
+		        }
+
+
+		        String otp = String.format("%06d", new Random().nextInt(999999));
+		        
+		        userOpt.get().setOtp(otp);
+		        userOpt.get().setModifiedOn(new Timestamp(System.currentTimeMillis()));
+		        userRepository.save(userOpt.get());
+
+		        String subject = "Password Reset OTP - GoRAP";
+		        String htmlBody = "<h3>Your OTP for password reset is:</h3>" +
+		                "<h2 style='color:#2E86C1;'>" + otp + "</h2>" +
+		                "<p>This OTP is valid for 10 minutes.</p>";
+
+		        emailService.sendHtmlMail(email, subject, htmlBody);
+		        log.info("email sent sucessfully " ,email);
+		}catch(Exception e) {
+			log.info("exception e", e);
+		
+	    }
+		
+	}
+	@Override
+	public ResponseModel<String> verifyOtp(String email, String otp) {
+	    log.info("Begin AuthServiceImpl -> verifyOtp()");
+	    ResponseModel<String> response = new ResponseModel<>();
+
+	    try {
+	        Optional<User> userOpt = userRepository.findByEmail(email);
+	        if (userOpt.isEmpty()) {
+	            response.setSuccess(false);
+	            response.setStatusCode(HttpStatus.NOT_FOUND.toString());
+	            response.setMessage("User not found with email: " + email);
+	            return response;
+	        }
+
+	        User user = userOpt.get();
+
+	        // Check OTP validity
+	        if (user.getOtp() == null || !user.getOtp().equals(otp)) {
+	            response.setSuccess(false);
+	            response.setStatusCode(HttpStatus.BAD_REQUEST.toString());
+	            response.setMessage("Invalid OTP.");
+	            return response;
+	        }
+
+	        long currentTime = System.currentTimeMillis();
+	        long otpTime = user.getModifiedOn().getTime();
+	        long diffMillis = currentTime - otpTime;
+
+	        if (diffMillis > 2 * 60 * 1000) {
+	            response.setSuccess(false);
+	            response.setStatusCode(HttpStatus.BAD_REQUEST.toString());
+	            response.setMessage("OTP expired. Please request a new one.");
+	            return response;
+	        }
+
+	    
+	        user.setOtp(null);
+	        userRepository.save(user);
+
+	        response.setSuccess(true);
+	        response.setStatusCode(HttpStatus.OK.toString());
+	        response.setMessage("OTP verified successfully.");
+	        response.setData("Verified");
+	        return response;
+
+	    } catch (Exception e) {
+	        log.error("Error verifying OTP", e);
+	        response.setSuccess(false);
+	        response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.toString());
+	        response.setMessage("Error verifying OTP: " + e.getMessage());
+	        return response;
+	    }
+	}
+	
+
+
 }
+

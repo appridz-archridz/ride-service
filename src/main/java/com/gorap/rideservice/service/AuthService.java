@@ -25,5 +25,9 @@ public interface AuthService {
 	ResponseModel<SignupRequest> getProfileDetails(UUID userId);
 	
 	ResponseModel<User> updateProfile(User user);
+
+	void forgotPassword(String email);
+
+	ResponseModel<String> verifyOtp(String email, String otp);
 	
 }

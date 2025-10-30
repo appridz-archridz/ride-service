@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.gorap.rideservice.auth.UserPrincipal;
@@ -113,6 +114,25 @@ public class AuthController {
 	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseModel);
 		}
 	}
+	
+	@PostMapping("/forgot-password")
+	public ResponseEntity<String> forgotPassword(@RequestParam String email) throws Exception {
+		log.info("Begin User Authentication Controller -> forgotPassword() method");
+		authService.forgotPassword(email);
+		log.info("End User Authentication Controller -> forgotPassword() method");
+		return ResponseEntity.ok("Password reset link sent to your email");
+	}
+	
+	@PostMapping("/verify-otp")
+    public ResponseEntity<ResponseModel<String>> verifyOtp(
+            @RequestParam String email,
+            @RequestParam String otp) {
+		log.info("Begin User Authentication Controller -> forgotPassword() method");
+		ResponseModel<String> response=authService.verifyOtp(email, otp);
+		log.info("End User Authentication Controller -> forgotPassword() method");
+        HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+		return ResponseEntity.status(httpStatus).body(response);
+    }
 
 	@PostMapping("/logout")
 	public ResponseEntity<?> logoutUser() {

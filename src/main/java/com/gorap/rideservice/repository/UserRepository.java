@@ -31,4 +31,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     
 
     Boolean existsByPhoneNumber(String phoneNumber);
+
+
+	Optional<User> findByEmail(String email);
 }
