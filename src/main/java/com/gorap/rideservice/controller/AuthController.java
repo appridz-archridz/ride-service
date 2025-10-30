@@ -7,11 +7,13 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.gorap.rideservice.auth.UserPrincipal;
+import com.gorap.rideservice.entity.User;
 import com.gorap.rideservice.request.LoginRequest;
 import com.gorap.rideservice.request.SignupRequest;
 import com.gorap.rideservice.response.JwtResponse;
@@ -35,7 +37,7 @@ public class AuthController {
 	private final AuthService authService;
 	private final HttpStatusCode httpStatusCode;
 
-	@PostMapping("/signin")
+	@PostMapping("/signin") 
 	public ResponseEntity<ResponseModel<JwtResponse>> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
 		ResponseModel<JwtResponse> jwtResponse = authService.authenticateUser(loginRequest);
 		HttpStatus httpStatusFromCode = httpStatusCode.getHttpStatusFromCode(jwtResponse.getStatusCode());
@@ -98,7 +100,19 @@ public class AuthController {
 	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
 	    }
 	}
-
+	
+	@PutMapping("/update-profile")
+	public ResponseEntity<ResponseModel<User>> updateProfile(@RequestBody User user) {
+		log.info("Begin AuthCOntroller -> updateProfile()");
+	    ResponseModel<User> responseModel = new ResponseModel<>();
+		try {
+			ResponseModel<User> response = authService.updateProfile(user);
+			return ResponseEntity.status(HttpStatus.OK).body(response);
+		} catch (Exception e) {
+	        log.error("Error retrieving user profile", e);
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseModel);
+		}
+	}
 
 	@PostMapping("/logout")
 	public ResponseEntity<?> logoutUser() {

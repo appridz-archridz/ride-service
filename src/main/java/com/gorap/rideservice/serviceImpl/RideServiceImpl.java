@@ -106,6 +106,7 @@ public class RideServiceImpl implements RideService {
 
             // join all coordinates as a single string separated by semicolons
             String polylineStr = String.join(";", pathSet);
+            System.out.println("path is " + polylineStr);
 
             System.out.println("Polyline string: " + polylineStr);
             ride.setPolyline(polylineStr);

@@ -172,11 +172,67 @@ public class AuthServiceImpl implements AuthService {
     	try {
     		User userDetails = userRepository.getById(userId);
     	} catch (Exception e) {
-    		
+    		 
     	}
     	return null;
     }
 
+    @Override
+    public ResponseModel<User> updateProfile(User user) {
+    	log.info("Begin AuthServiceImpl -> updateProfile()");
+    	ResponseModel<User> responseModel = new ResponseModel<User>();
+    	try {
+    		String userName = user.getUserName();
+    		UUID userId = user.getId();
+    	    User userDetails = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+    	    if (user.getUserName() != null && !user.getUserName().trim().isEmpty()) {
+    	        userDetails.setUserName(user.getUserName().trim());
+    	    }
+
+    	    if (user.getPassword() != null && !user.getPassword().trim().isEmpty()) {
+    	        userDetails.setPassword(user.getPassword().trim());
+    	    }
+
+    	    if (user.getEmail() != null && !user.getEmail().trim().isEmpty()) {
+    	        userDetails.setEmail(user.getEmail().trim());
+    	    }
+
+    	    if (user.getDeviceName() != null && !user.getDeviceName().trim().isEmpty()) {
+    	        userDetails.setDeviceName(user.getDeviceName().trim());
+    	    }
+
+    	    if (user.getRole() != null) {
+    	        userDetails.setRole(user.getRole());
+    	    }
+
+    	    if (user.getPhoneNumber() != null && !user.getPhoneNumber().trim().isEmpty()) {
+    	        userDetails.setPhoneNumber(user.getPhoneNumber().trim());
+    	    }
+
+    	    if (user.getAddress() != null && !user.getAddress().trim().isEmpty()) {
+    	        userDetails.setAddress(user.getAddress().trim());
+    	    }
+
+    	    if (user.getProfilePic() != null && !user.getProfilePic().trim().isEmpty()) {
+    	        userDetails.setProfilePic(user.getProfilePic().trim());
+    	    }
+    	    
+    	    userRepository.save(userDetails);
+    	    User response = userRepository.getById(userId);
+    		responseModel.setStatusCode(HttpStatus.OK.toString());
+    		responseModel.setData(response);
+    		responseModel.setSuccess(true);
+    		responseModel.setMessage("User updated succesfull!!");
+    		return responseModel;
+    	} catch(Exception e) {
+            log.error("Error during user registration", e);
+            responseModel.setSuccess(false);
+            responseModel.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.toString());
+            responseModel.setMessage("Failed to register user: " + e.getMessage());
+            return responseModel;
+    	}
+    }
 
     @Override
     public boolean existsByEmail(String email) {
