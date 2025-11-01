@@ -53,12 +53,13 @@ public class RideServiceImpl implements RideService {
         		return createErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid path");
         	}
         	
+        	
             // Validate coordinates
             if (!isValidCoordinates(rideDTO.getStartLatitude(), rideDTO.getStartLongitude()) ||
                 !isValidCoordinates(rideDTO.getDestinationLatitude(), rideDTO.getDestinationLongitude())) {
                 return createErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid coordinates provided");
             }
-
+ 
             // Validate via points coordinates
             if (rideDTO.getViaPoints() != null) {
                 for (var viaPoint : rideDTO.getViaPoints()) {
@@ -106,9 +107,7 @@ public class RideServiceImpl implements RideService {
 
             // join all coordinates as a single string separated by semicolons
             String polylineStr = String.join(";", pathSet);
-            System.out.println("path is " + polylineStr);
 
-            System.out.println("Polyline string: " + polylineStr);
             ride.setPolyline(polylineStr);
 
             ride.setDistanceKm(routeResult != null ? routeResult.getDistanceKm() : tripDistance);
@@ -118,6 +117,7 @@ public class RideServiceImpl implements RideService {
             response.setStatusCode(String.valueOf(HttpStatus.CREATED.value()));
             response.setMessage("Ride created successfully");
             response.setData(saved);
+            response.setSuccess(true);
             
             log.info("Ride created successfully with ID: {} with polyline: {}", 
                 saved.getId(), saved.getPolyline() != null ? "Yes" : "No");

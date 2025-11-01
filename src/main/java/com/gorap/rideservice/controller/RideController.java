@@ -38,13 +38,13 @@ public class RideController {
 
     @PostMapping("/create/{userId}")
     public ResponseEntity<ResponseModel<CreateRide>> createRide(
-            @PathVariable UUID userId,
+            @PathVariable UUID userId, 
             @RequestBody RideDTO rideDTO) {
 
         log.info("Begin RideController -> createRide()");
         ResponseModel<CreateRide> response = rideService.createRide(rideDTO, userId);
-        log.info("End RideController -> createRide()");
         HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+        log.info("End RideController -> createRide()");
         return ResponseEntity.status(httpStatus).body(response);
     }
     
