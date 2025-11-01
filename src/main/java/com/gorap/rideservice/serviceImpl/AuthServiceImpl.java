@@ -342,6 +342,41 @@ public class AuthServiceImpl implements AuthService {
 	    }
 	}
 	
+	@Override
+	public ResponseModel<String> updatePassword(String email, String newPassword) {
+	    log.info("Begin AuthServiceImpl -> updatePassword()");
+	    ResponseModel<String> response = new ResponseModel<>();
+
+	    try {
+	        Optional<User> userOpt = userRepository.findByEmail(email);
+	        if (userOpt.isEmpty()) {
+	         throw new Exception("User Not Found"+ email);
+	        }
+
+	        User user = userOpt.get();
+	        String encryptedPassword = passwordEncoder.encode(newPassword);
+	        user.setPassword(encryptedPassword);
+
+	        user.setOtp(null);
+
+	        userRepository.save(user);
+
+	        response.setSuccess(true);
+	        response.setStatusCode(HttpStatus.OK.toString());
+	        response.setMessage("Password updated successfully.");
+	        response.setData("Updated");
+	        return response;
+
+	    } catch (Exception e) {
+	        log.error("Error updating password", e);
+	        response.setSuccess(false);
+	        response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.toString());
+	        response.setMessage("Error updating password: " + e.getMessage());
+	        return response;
+	    }
+	}
+
+	
 
 
 }

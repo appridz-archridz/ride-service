@@ -29,5 +29,7 @@ public interface AuthService {
 	void forgotPassword(String email);
 
 	ResponseModel<String> verifyOtp(String email, String otp);
+
+	ResponseModel<String> updatePassword(String email, String newPassword);
 	
 }

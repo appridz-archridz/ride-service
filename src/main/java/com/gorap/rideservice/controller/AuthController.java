@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -138,6 +139,20 @@ public class AuthController {
 	public ResponseEntity<?> logoutUser() {
 		return ResponseEntity.ok(new MessageResponse("User logged out successfully!"));
 	}
+	
+	@PatchMapping("/update-password")
+	public ResponseEntity<ResponseModel<String>> updatePassword(
+	        @RequestParam String email,
+	        @RequestParam String password) {
+
+	    log.info("Begin User Authentication Controller -> updatePassword() method");
+	    ResponseModel<String> response = authService.updatePassword(email, password);
+	    log.info("End User Authentication Controller -> updatePassword() method");
+
+	    HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+	    return ResponseEntity.status(httpStatus).body(response);
+	}
+
 
 	@PostMapping("/refresh")
 	public ResponseEntity<?> refreshToken(@AuthenticationPrincipal UserPrincipal currentUser) {
@@ -155,5 +170,7 @@ public class AuthController {
 					.body(new MessageResponse("Error refreshing token!", false));
 		}
 	}
+	
+
 	
 }
