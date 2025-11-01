@@ -2,6 +2,7 @@ package com.gorap.rideservice.repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.gorap.rideservice.entity.CreateRide;
+import com.gorap.rideservice.response.RideDetailsProjection;
 
 
 
@@ -42,6 +44,24 @@ public interface RideRepository extends JpaRepository<CreateRide, UUID> {
 	 @Param("destinationLat") Double destinationLat,
 	 @Param("destinationLng") Double destinationLng
 	);
+	
+	
+    @Query(value = """
+            SELECT 
+                r.id AS id,
+                u.phone_number AS phoneNumber,
+                u.profile_pic AS profilePic,
+                u.user_name AS userName,
+                r.ride_date AS rideDate,
+                r.ride_time AS rideTime,
+                r.distance_km AS distanceKm,
+                r.start_point AS startPoint,
+                r.destination_point AS destinationPoint
+            FROM ride.create_ride r
+            LEFT JOIN identity.users u ON u.id = r.created_by
+            WHERE r.id = :rideId
+        """, nativeQuery = true)
+        Optional<RideDetailsProjection> findRideDetailsById(UUID rideId);
 
 	@Query(value = "SELECT * FROM create_ride",
 	    nativeQuery = true)

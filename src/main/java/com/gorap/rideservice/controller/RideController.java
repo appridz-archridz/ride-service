@@ -18,6 +18,7 @@ import com.gorap.rideservice.entity.CreateRide;
 import com.gorap.rideservice.repository.RideRepository;
 import com.gorap.rideservice.request.RideDTO;
 import com.gorap.rideservice.request.SearchRideDTO;
+import com.gorap.rideservice.response.RideDetailsProjection;
 import com.gorap.rideservice.service.RideService;
 import com.gorap.rideservice.util.HttpStatusCode;
 import com.gorap.rideservice.util.ResponseModel;
@@ -37,13 +38,13 @@ public class RideController {
 
     @PostMapping("/create/{userId}")
     public ResponseEntity<ResponseModel<CreateRide>> createRide(
-            @PathVariable UUID userId,
+            @PathVariable UUID userId, 
             @RequestBody RideDTO rideDTO) {
 
         log.info("Begin RideController -> createRide()");
         ResponseModel<CreateRide> response = rideService.createRide(rideDTO, userId);
-        log.info("End RideController -> createRide()");
         HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+        log.info("End RideController -> createRide()");
         return ResponseEntity.status(httpStatus).body(response);
     }
     
@@ -70,6 +71,17 @@ public class RideController {
         
         return ResponseEntity.ok(debug);
     }
+    
+    @GetMapping("/get/{rideId}")
+    public ResponseEntity<ResponseModel<RideDetailsProjection>> getRideDetails(@PathVariable UUID rideId) {
+        log.info("Begin RideController -> getRideDetails()");
+        ResponseModel<RideDetailsProjection> response = rideService.getRideDetails(rideId);
+        HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+        log.info("End RideController -> getRideDetails()");
+        return ResponseEntity.status(httpStatus).body(response);
+    }
+    
+
     
     
 }

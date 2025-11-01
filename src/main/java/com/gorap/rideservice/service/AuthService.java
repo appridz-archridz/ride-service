@@ -3,6 +3,7 @@ package com.gorap.rideservice.service;
 import java.util.UUID;
 
 import com.gorap.rideservice.auth.UserPrincipal;
+import com.gorap.rideservice.entity.User;
 import com.gorap.rideservice.request.LoginRequest;
 import com.gorap.rideservice.request.SignupRequest;
 import com.gorap.rideservice.response.JwtResponse;
@@ -23,6 +24,6 @@ public interface AuthService {
 	
 	ResponseModel<SignupRequest> getProfileDetails(UUID userId);
 	
+	ResponseModel<User> updateProfile(User user);
 	
-
 }

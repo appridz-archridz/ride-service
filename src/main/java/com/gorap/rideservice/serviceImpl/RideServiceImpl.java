@@ -1,7 +1,7 @@
 package com.gorap.rideservice.serviceImpl;
 
+
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -17,6 +17,7 @@ import com.gorap.rideservice.entity.ViaPoints;
 import com.gorap.rideservice.repository.RideRepository;
 import com.gorap.rideservice.request.RideDTO;
 import com.gorap.rideservice.request.SearchRideDTO;
+import com.gorap.rideservice.response.RideDetailsProjection;
 import com.gorap.rideservice.service.RideService;
 import com.gorap.rideservice.util.ResponseModel;
 import com.gorap.rideservice.util.RoutingService;
@@ -52,12 +53,13 @@ public class RideServiceImpl implements RideService {
         		return createErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid path");
         	}
         	
+        	
             // Validate coordinates
             if (!isValidCoordinates(rideDTO.getStartLatitude(), rideDTO.getStartLongitude()) ||
                 !isValidCoordinates(rideDTO.getDestinationLatitude(), rideDTO.getDestinationLongitude())) {
                 return createErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid coordinates provided");
             }
-
+ 
             // Validate via points coordinates
             if (rideDTO.getViaPoints() != null) {
                 for (var viaPoint : rideDTO.getViaPoints()) {
@@ -106,7 +108,6 @@ public class RideServiceImpl implements RideService {
             // join all coordinates as a single string separated by semicolons
             String polylineStr = String.join(";", pathSet);
 
-            System.out.println("Polyline string: " + polylineStr);
             ride.setPolyline(polylineStr);
 
             ride.setDistanceKm(routeResult != null ? routeResult.getDistanceKm() : tripDistance);
@@ -116,6 +117,7 @@ public class RideServiceImpl implements RideService {
             response.setStatusCode(String.valueOf(HttpStatus.CREATED.value()));
             response.setMessage("Ride created successfully");
             response.setData(saved);
+            response.setSuccess(true);
             
             log.info("Ride created successfully with ID: {} with polyline: {}", 
                 saved.getId(), saved.getPolyline() != null ? "Yes" : "No");
@@ -666,5 +668,31 @@ public class RideServiceImpl implements RideService {
         public String toString() {
             return String.format("BoundingBox[(%f,%f) to (%f,%f)]", minLat, minLng, maxLat, maxLng);
         }
+    }
+    
+    
+    @Override
+    public ResponseModel<RideDetailsProjection> getRideDetails(UUID rideId) {
+        log.info("Fetching ride details for ID: {}", rideId);
+        ResponseModel<RideDetailsProjection> response = new ResponseModel<>();
+
+        try {
+            var rideDetailsOpt = rideRepository.findRideDetailsById(rideId);
+            if (rideDetailsOpt.isEmpty()) {
+                response.setStatusCode(String.valueOf(HttpStatus.NOT_FOUND.value()));
+                response.setMessage("Ride not found for ID: " + rideId);
+                return response;
+            }
+
+            response.setStatusCode(String.valueOf(HttpStatus.OK.value()));
+            response.setMessage("Ride details fetched successfully");
+            response.setData(rideDetailsOpt.get());
+        } catch (Exception e) {
+            log.error("Error fetching ride details: ", e);
+            response.setStatusCode(String.valueOf(HttpStatus.INTERNAL_SERVER_ERROR.value()));
+            response.setMessage("Failed to fetch ride details: " + e.getMessage());
+        }
+
+        return response;
     }
 }
