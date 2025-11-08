@@ -53,12 +53,13 @@ public class RideServiceImpl implements RideService {
         		return createErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid path");
         	}
         	
+        	
             // Validate coordinates
             if (!isValidCoordinates(rideDTO.getStartLatitude(), rideDTO.getStartLongitude()) ||
                 !isValidCoordinates(rideDTO.getDestinationLatitude(), rideDTO.getDestinationLongitude())) {
                 return createErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid coordinates provided");
             }
-
+ 
             // Validate via points coordinates
             if (rideDTO.getViaPoints() != null) {
                 for (var viaPoint : rideDTO.getViaPoints()) {
@@ -79,45 +80,18 @@ public class RideServiceImpl implements RideService {
                 return createErrorResponse(response, HttpStatus.BAD_REQUEST, 
                     String.format("Trip distance too short. Minimum: %.1f km", MIN_TRIP_DISTANCE_KM));
             }
-
-            // Get route from OSRM
-            RoutingService.RouteResult routeResult = routingService.getRoute(
-                rideDTO.getStartLatitude(), rideDTO.getStartLongitude(),
-                rideDTO.getDestinationLatitude(), rideDTO.getDestinationLongitude()
-            );
-
-            if (routeResult == null || routeResult.getPolyline() == null || routeResult.getPolyline().trim().isEmpty()) {
-                log.warn("No route found from OSRM for coordinates: ({},{}) to ({},{})", 
-                    rideDTO.getStartLatitude(), rideDTO.getStartLongitude(),
-                    rideDTO.getDestinationLatitude(), rideDTO.getDestinationLongitude());
-            }
-
-            // Create and save ride
+            
             CreateRide ride = mapToEntity(rideDTO);
             ride.setCreatedBy(userId);
-            
-            List<double[]> polyline = decodePolyline(rideDTO.getPolyline());
-            Set<String> pathSet = new LinkedHashSet<>();
 
-            for (double[] point : polyline) {
-                String coord = point[0] + "," + point[1];
-                pathSet.add(coord);
-            }
-
-            // join all coordinates as a single string separated by semicolons
-            String polylineStr = String.join(";", pathSet);
-            System.out.println("path is " + polylineStr);
-
-            System.out.println("Polyline string: " + polylineStr);
-            ride.setPolyline(polylineStr);
-
-            ride.setDistanceKm(routeResult != null ? routeResult.getDistanceKm() : tripDistance);
+            ride.setPolyline(rideDTO.getPolyline());
 
             CreateRide saved = rideRepository.save(ride);
 
             response.setStatusCode(String.valueOf(HttpStatus.CREATED.value()));
             response.setMessage("Ride created successfully");
             response.setData(saved);
+            response.setSuccess(true);
             
             log.info("Ride created successfully with ID: {} with polyline: {}", 
                 saved.getId(), saved.getPolyline() != null ? "Yes" : "No");
@@ -147,27 +121,11 @@ public class RideServiceImpl implements RideService {
                 return createErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid search coordinates");
             }
 
-            // FIXED: Calculate expanded bounding box to include all potential rides
-            BoundingBox bbox = calculateExpandedBoundingBox(
-                searchRideDTO.getSourceLatitude(), searchRideDTO.getSourceLongitude(),
-                searchRideDTO.getDestinationLatitude(), searchRideDTO.getDestinationLongitude()
-            );
-
-            log.debug("Search bounding box: ({:.4f},{:.4f}) to ({:.4f},{:.4f})", 
-                bbox.minLat, bbox.minLng, bbox.maxLat, bbox.maxLng);
-
-            // Get candidate rides from database
-            List<CreateRide> candidateExactRides = rideRepository.findExactRides(
-            	    searchRideDTO.getSourceLatitude(), 
-            	    searchRideDTO.getSourceLongitude(),
-            	    searchRideDTO.getDestinationLatitude(),
-            	    searchRideDTO.getDestinationLongitude()
-            	    // searchRideDTO.getLocalDate()
-            	);
-
-            	List<CreateRide> allRides = rideRepository.findMiddleRides(
+            	List<CreateRide> allRides = rideRepository.findAll(
             	    // searchRideDTO.getLocalDate()
             	); 
+            	
+            	System.out.println("all rides are " + allRides.size());
 
             	List<CreateRide> candidateMiddleRides = new ArrayList<>();
             	
@@ -178,14 +136,10 @@ public class RideServiceImpl implements RideService {
             	    boolean isRideMatch =  isRouteMatching(polyline, searchRideDTO.getSourceLatitude(), searchRideDTO.getSourceLongitude(), searchRideDTO.getDestinationLatitude(), searchRideDTO.getDestinationLongitude());
             	    
 	            	if (isRideMatch) {
-	            		System.out.println("start (lat, lng)  " + searchRideDTO.getSourceLatitude() + " " + searchRideDTO.getSourceLongitude());
-	            		System.out.println("end (lat, lng)  " + searchRideDTO.getDestinationLatitude() + " " + searchRideDTO.getDestinationLongitude());
-	            		System.out.println("polyline " + polyline);
-	            		System.out.println("isRidMatch - " + ride.getStartPoint() + " " + isRideMatch);
 	            		candidateMiddleRides.add(ride);
 	            	}
             	}
-            	List<CreateRide> candidateRides = new ArrayList<>(candidateExactRides);
+            	List<CreateRide> candidateRides = new ArrayList<>();
             	candidateRides.addAll(candidateMiddleRides);
             
             log.debug("Found {} candidate rides in bounding box", candidateRides.size());
@@ -205,9 +159,10 @@ public class RideServiceImpl implements RideService {
     }
     
     public static boolean isRouteMatching(String polyline, double startLat, double startLng, double endLat, double endLng) {
+    	log.info("Begin RideServiceImpl -> isRouteMatching()" + polyline);
         String[] points = polyline.split(";");
         boolean sourceFound = false;
-        double tolerance = 0.00050; // roughly ~55 meters
+        double tolerance = 0.001;
 
         for (String point : points) {
             String[] latLng = point.split(",");
@@ -215,10 +170,10 @@ public class RideServiceImpl implements RideService {
 
             double lat = Double.parseDouble(latLng[0]);
             double lng = Double.parseDouble(latLng[1]);
-
+            
             if (!sourceFound) {
                 // Check for start point match
-                if (Math.abs(startLat - lat) <= tolerance && Math.abs(startLng - lng) <= tolerance) {
+                if ((Math.abs(startLat - lat) <= tolerance && Math.abs(startLng - lng) <= tolerance)) {
                     sourceFound = true;
                 }
             } else {
@@ -232,118 +187,6 @@ public class RideServiceImpl implements RideService {
         return false; // no full match found
     }
 
-
-    private boolean isRideMatching(CreateRide ride, double srcLat, double srcLng, double destLat, double destLng) {
-        log.debug("Checking ride {} for matching", ride.getId());
-        
-        // Check exact route match first
-        if (isExactRouteMatch(ride, srcLat, srcLng, destLat, destLng)) {
-            log.debug("Exact route match for ride {}", ride.getId());
-            return true;
-        }
-
-        // Check via points match
-        if (ride.getViaPoints() != null && !ride.getViaPoints().isEmpty()) {
-            if (checkViaPointsMatching(ride.getViaPoints(), srcLat, srcLng, destLat, destLng)) {
-                log.debug("Via points match for ride {}", ride.getId());
-                return true;
-            }
-        }
-
-        // Check polyline match for intermediate routes
-        if (ride.getPolyline() != null && !ride.getPolyline().trim().isEmpty()) {
-            if (isIntermediateRouteMatching(ride, srcLat, srcLng, destLat, destLng)) {
-                log.debug("Intermediate route match for ride {}", ride.getId());
-                return true;
-            }
-        } else {
-            log.debug("No polyline data for ride {}", ride.getId());
-        }
-
-        log.debug("No match found for ride {}", ride.getId());
-        return false;
-    }
-
-    private boolean isExactRouteMatch(CreateRide ride, double srcLat, double srcLng, double destLat, double destLng) {
-        boolean startMatch = isClose(ride.getStartLatitude(), ride.getStartLongitude(), srcLat, srcLng, STRICT_TOLERANCE_KM);
-        boolean endMatch = isClose(ride.getDestinationLatitude(), ride.getDestinationLongitude(), destLat, destLng, STRICT_TOLERANCE_KM);
-        
-        log.debug("Exact route check for ride {}: start={}, end={}", ride.getId(), startMatch, endMatch);
-        
-        return startMatch && endMatch;
-    }
-
-    private boolean isIntermediateRouteMatching(CreateRide ride, double srcLat, double srcLng, double destLat, double destLng) {
-        if (ride.getPolyline() == null || ride.getPolyline().trim().isEmpty()) {
-            log.debug("No polyline data for ride {}", ride.getId());
-            return false;
-        }
-
-        try {
-            List<double[]> routePoints = decodePolyline(ride.getPolyline());
-            if (routePoints.size() < 2) {
-                log.debug("Insufficient polyline points for ride {}: {}", ride.getId(), routePoints.size());
-                return false;
-            }
-
-            log.debug("Decoded {} polyline points for ride {}", routePoints.size(), ride.getId());
-            
-            // DEBUG: Log first, middle, and last points to understand route coverage
-            if (routePoints.size() > 0) {
-                double[] first = routePoints.get(0);
-                double[] last = routePoints.get(routePoints.size() - 1);
-                double[] middle = routePoints.get(routePoints.size() / 2);
-                log.debug("Route sample points - First: ({:.4f},{:.4f}), Middle: ({:.4f},{:.4f}), Last: ({:.4f},{:.4f})", 
-                    first[0], first[1], middle[0], middle[1], last[0], last[1]);
-            }
-
-            // Find closest points on route
-            RouteMatch sourceMatch = findClosestPointOnRoute(routePoints, srcLat, srcLng);
-            RouteMatch destMatch = findClosestPointOnRoute(routePoints, destLat, destLng);
-
-            log.debug("Route matching for ride {}: source={}, dest={}", 
-                ride.getId(), 
-                sourceMatch != null ? String.format("dist=%.3f", sourceMatch.distanceToRoute) : "null",
-                destMatch != null ? String.format("dist=%.3f", destMatch.distanceToRoute) : "null");
-
-            // Validate matches
-            if (sourceMatch == null || sourceMatch.distanceToRoute > TOLERANCE_KM ||
-                destMatch == null || destMatch.distanceToRoute > TOLERANCE_KM) {
-                log.debug("Route points too far from polyline for ride {}", ride.getId());
-                return false;
-            }
-
-            // Check direction (source before destination)
-            if (sourceMatch.routeDistance >= destMatch.routeDistance) {
-                log.debug("Route direction incorrect for ride {} (source: {:.2f}, dest: {:.2f})", 
-                    ride.getId(), sourceMatch.routeDistance, destMatch.routeDistance);
-                return false;
-            }
-
-            // Validate segment distance
-            double segmentDistance = destMatch.routeDistance - sourceMatch.routeDistance;
-            double directDistance = haversine(srcLat, srcLng, destLat, destLng);
-
-            if (segmentDistance < MIN_TRIP_DISTANCE_KM) {
-                log.debug("Segment too short for ride {}: {:.2f}km", ride.getId(), segmentDistance);
-                return false;
-            }
-
-            if (segmentDistance > directDistance * MAX_DETOUR_RATIO) {
-                log.debug("Segment too long for ride {} (segment: {:.2f}km, direct: {:.2f}km, ratio: {:.2f})", 
-                    ride.getId(), segmentDistance, directDistance, segmentDistance / directDistance);
-                return false;
-            }
-
-            log.debug("Polyline match found for ride {} - Segment: {:.2f}km, Direct: {:.2f}km", 
-                ride.getId(), segmentDistance, directDistance);
-            return true;
-
-        } catch (Exception e) {
-            log.error("Error in route matching for ride {}: {}", ride.getId(), e.getMessage(), e);
-            return false;
-        }
-    }
 
     private RouteMatch findClosestPointOnRoute(List<double[]> routePoints, double lat, double lng) {
         RouteMatch bestMatch = null;
