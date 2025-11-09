@@ -1,6 +1,7 @@
 package com.gorap.rideservice.config;
 
 import java.util.Arrays;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,8 +19,10 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+
 import com.gorap.rideservice.auth.AuthEntryPointJwt;
 import com.gorap.rideservice.auth.AuthTokenFilter;
+import com.gorap.rideservice.auth.JwtAccessDeniedHandler;
 import com.gorap.rideservice.auth.UserDetailsServiceImpl;
 
 @Configuration
@@ -31,6 +34,8 @@ public class SecurityConfig {
 
     @Autowired
     private AuthEntryPointJwt unauthorizedHandler;
+    @Autowired
+	private  JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
     @Bean
     public AuthTokenFilter authenticationJwtTokenFilter() {
@@ -59,7 +64,10 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
-            .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
+            .exceptionHandling(
+            		exception -> exception.authenticationEntryPoint(unauthorizedHandler)
+            		.accessDeniedHandler(jwtAccessDeniedHandler)
+            		)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> 
                 auth.requestMatchers("/api/auth/**").permitAll()

@@ -2,9 +2,7 @@ package com.gorap.rideservice.serviceImpl;
 
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -31,12 +29,9 @@ import lombok.extern.slf4j.Slf4j;
 public class RideServiceImpl implements RideService {
 
     private final RideRepository rideRepository;
-    private final RoutingService routingService;
 
     // Configuration constants
     private static final double TOLERANCE_KM = 2.0; // Distance tolerance for route matching
-    private static final double STRICT_TOLERANCE_KM = 0.5; // For exact start/end matching
-    private static final double MAX_DETOUR_RATIO = 3.0; // Maximum allowed detour ratio
     private static final double MIN_TRIP_DISTANCE_KM = 0.5; // Minimum viable trip distance
     private static final double SEARCH_RADIUS_KM = 50.0; // Search bounding box radius
     private static final int EARTH_RADIUS_KM = 6371; // Earth radius for Haversine formula
