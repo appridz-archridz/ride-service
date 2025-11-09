@@ -40,7 +40,6 @@ public class CreateRide extends BaseEntity {
 
     private Integer availableSeats;
 
-    @Lob
     private String polyline;
 
     private Double distanceKm; // Distance in km from OSRM

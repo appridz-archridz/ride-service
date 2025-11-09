@@ -50,7 +50,7 @@ public class RideController {
     
     @PostMapping("/search")
     public ResponseEntity<ResponseModel<List<CreateRide>>> searchRides(@RequestBody SearchRideDTO searchRideDTO) {
-    	   log.info("Begin RideController -> createRide()");
+    	   log.info("Begin RideController -> searchRide()");
            ResponseModel<List<CreateRide>> response = rideService.searchRides(searchRideDTO);
            log.info("End RideController -> createRide()");
            HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());

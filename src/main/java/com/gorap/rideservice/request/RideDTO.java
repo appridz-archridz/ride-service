@@ -32,6 +32,6 @@ public class RideDTO {
     private Integer availableSeats;
     
     private String polyline;
-
+    
     private List<ViaPointDTO> viaPoints;
 }
