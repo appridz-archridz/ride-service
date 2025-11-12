@@ -12,13 +12,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.gorap.rideservice.entity.CreateRide;
 import com.gorap.rideservice.entity.ViaPoints;
+import com.gorap.rideservice.exception.RecordNotFoundException;
 import com.gorap.rideservice.repository.RideRepository;
 import com.gorap.rideservice.request.RideDTO;
+import com.gorap.rideservice.request.RideUpdateDto;
 import com.gorap.rideservice.request.SearchRideDTO;
+import com.gorap.rideservice.response.CreateRideProjection;
 import com.gorap.rideservice.response.RideDetailsProjection;
 import com.gorap.rideservice.service.RideService;
 import com.gorap.rideservice.util.ResponseModel;
-import com.gorap.rideservice.util.RoutingService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -535,4 +537,60 @@ public class RideServiceImpl implements RideService {
 
         return response;
     }
+    
+    @Override
+    public ResponseModel<List<CreateRideProjection>> getRidesByUser(UUID userId) {
+        log.info("Fetching rides created by user ID: {}", userId);
+        ResponseModel<List<CreateRideProjection>> response = new ResponseModel<>();
+
+        try {
+            var rides = rideRepository.findRidesByCreatedBy(userId);
+            if (rides.isEmpty()) {
+                response.setStatusCode(String.valueOf(HttpStatus.NOT_FOUND.value()));
+                response.setMessage("No rides found for user ID: " + userId);
+                return response;
+            }
+
+            response.setStatusCode(String.valueOf(HttpStatus.OK.value()));
+            response.setMessage("Rides fetched successfully");
+            response.setData(rides);
+        } catch (Exception e) {
+            log.error("Error fetching rides by user: ", e);
+            response.setStatusCode(String.valueOf(HttpStatus.INTERNAL_SERVER_ERROR.value()));
+            response.setMessage("Failed to fetch rides: " + e.getMessage());
+        }
+
+        return response;
+    }
+
+    @Override
+    public ResponseModel<CreateRide> updateStatus(RideUpdateDto rideUpdate) {
+        ResponseModel<CreateRide> response = new ResponseModel<>();
+
+        try {
+            CreateRide createRide = rideRepository.findById(rideUpdate.getId())
+                    .orElseThrow(() -> new RecordNotFoundException("Ride ID not found to update the status"));
+
+            createRide.setRideStatus(rideUpdate.getRideStatus());
+            createRide.setAvailableSeats(rideUpdate.getAvailableSeats());
+
+            CreateRide savedRide = rideRepository.save(createRide);
+
+            response.setData(savedRide);
+            response.setStatusCode(HttpStatus.OK.toString());
+            response.setMessage("Ride updated successfully");
+
+        } catch (RecordNotFoundException e) {
+            log.error("Ride not found: ", e);
+            response.setStatusCode(HttpStatus.NOT_FOUND.toString());
+            response.setMessage(e.getMessage());
+        } catch (Exception e) {
+            log.error("Error updating ride: ", e);
+            response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.toString());
+            response.setMessage("Failed to update ride: " + e.getMessage());
+        }
+
+        return response;
+    }
+
 }

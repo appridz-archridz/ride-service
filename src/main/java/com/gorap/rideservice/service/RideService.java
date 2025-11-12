@@ -5,7 +5,9 @@ import java.util.UUID;
 
 import com.gorap.rideservice.entity.CreateRide;
 import com.gorap.rideservice.request.RideDTO;
+import com.gorap.rideservice.request.RideUpdateDto;
 import com.gorap.rideservice.request.SearchRideDTO;
+import com.gorap.rideservice.response.CreateRideProjection;
 import com.gorap.rideservice.response.RideDetailsProjection;
 import com.gorap.rideservice.util.ResponseModel;
 
@@ -14,4 +16,8 @@ public interface RideService {
 
 	ResponseModel<List<CreateRide>> searchRides(SearchRideDTO searchRideDTO);
 	ResponseModel<RideDetailsProjection> getRideDetails(UUID rideId);
+
+	ResponseModel<List<CreateRideProjection>> getRidesByUser(UUID userId);
+
+	ResponseModel<CreateRide> updateStatus(RideUpdateDto rideUpdate);
 }
