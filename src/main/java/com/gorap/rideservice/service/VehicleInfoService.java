@@ -1,5 +1,6 @@
 package com.gorap.rideservice.service;
 
+import java.util.List;
 import java.util.UUID;
 
 import com.gorap.rideservice.entity.VehicleInfo;
@@ -14,4 +15,6 @@ public interface VehicleInfoService {
     ResponseModel<VehicleInfo> updateVehicle(UUID vehicleId, VehicleInfo vehicleInfo);
 
     ResponseModel<String> deleteVehicle(UUID vehicleId);
+    ResponseModel<List<VehicleInfo>> getAllVehiclesByUser(UUID userId);
+
 }

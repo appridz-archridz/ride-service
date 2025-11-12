@@ -1,5 +1,6 @@
 package com.gorap.rideservice.serviceImpl;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -181,4 +182,30 @@ public class VehicleInfoServiceImpl implements VehicleInfoService {
 
         return response;
     }
+    
+    @Override
+    public ResponseModel<List<VehicleInfo>> getAllVehiclesByUser(UUID userId) {
+
+        log.info("Fetching all vehicles for user: {}", userId);
+
+        ResponseModel<List<VehicleInfo>> response = new ResponseModel<>();
+
+        try {
+            List<VehicleInfo> vehicles = vehicleInfoRepository.findByCreatedBy(userId);
+
+            response.setStatusCode(String.valueOf(HttpStatus.OK.value()));
+            response.setSuccess(true);
+            response.setMessage("Vehicles fetched successfully");
+            response.setData(vehicles);
+
+        } catch (Exception e) {
+            log.error("Error fetching vehicles for user: {}", userId, e);
+            response.setStatusCode(String.valueOf(HttpStatus.INTERNAL_SERVER_ERROR.value()));
+            response.setSuccess(false);
+            response.setMessage("Failed to fetch vehicles: " + e.getMessage());
+        }
+
+        return response;
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.gorap.rideservice.controller;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -78,4 +79,18 @@ public class VehicleInfoController {
 
         return ResponseEntity.status(status).body(response);
     }
+    
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<ResponseModel<List<VehicleInfo>>> getAllVehiclesByUser(
+            @PathVariable UUID userId) {
+
+        log.info("Begin VehicleInfoController -> getAllVehiclesByUser()");
+
+        ResponseModel<List<VehicleInfo>> response = vehicleInfoService.getAllVehiclesByUser(userId);
+
+        HttpStatus status = HttpStatus.valueOf(Integer.parseInt(response.getStatusCode()));
+
+        return ResponseEntity.status(status).body(response);
+    }
+
 }
