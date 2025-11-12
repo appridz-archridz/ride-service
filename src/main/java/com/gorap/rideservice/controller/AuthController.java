@@ -1,5 +1,7 @@
 package com.gorap.rideservice.controller;
 
+import java.util.UUID;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,6 +20,8 @@ import com.gorap.rideservice.auth.UserPrincipal;
 import com.gorap.rideservice.entity.User;
 import com.gorap.rideservice.request.LoginRequest;
 import com.gorap.rideservice.request.SignupRequest;
+import com.gorap.rideservice.request.TokenRefreshRequest;
+import com.gorap.rideservice.request.TokenRefreshResponse;
 import com.gorap.rideservice.response.JwtResponse;
 import com.gorap.rideservice.response.MessageResponse;
 import com.gorap.rideservice.response.UserResponse;
@@ -154,21 +158,28 @@ public class AuthController {
 	}
 
 
-	@PostMapping("/refresh")
-	public ResponseEntity<?> refreshToken(@AuthenticationPrincipal UserPrincipal currentUser) {
-		try {
-			// Generate new token for current user
-			String newToken = authService.generateTokenForUser(currentUser);
-
-			JwtResponse jwtResponse = new JwtResponse(newToken, currentUser.getId(), currentUser.getUsername(),
-					currentUser.getEmail(), currentUser.getPhoneNumber(), currentUser.getAddress(),
-					currentUser.getUserRole());
-
-			return ResponseEntity.ok(jwtResponse);
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(new MessageResponse("Error refreshing token!", false));
-		}
+	@PostMapping("/refresh-token")
+	public ResponseEntity<ResponseModel<TokenRefreshResponse>> refreshToken(
+			 @RequestBody TokenRefreshRequest request) {
+		
+		log.info("Token refresh request received");
+		
+		ResponseModel<TokenRefreshResponse> response = authService.refreshToken(request);
+		HttpStatus httpStatusFromCode = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+		
+		return ResponseEntity.status(httpStatusFromCode).body(response);
+	}
+	
+	@PostMapping("/logout-all/{id}")
+	public ResponseEntity<ResponseModel<String>> logoutAllDevices(
+			@PathVariable UUID id) {
+		
+		log.info("Logout all devices request for user: {}", id);
+		
+		ResponseModel<String> response = authService.logoutAllDevices(id);
+		HttpStatus httpStatusFromCode = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+		
+		return ResponseEntity.status(httpStatusFromCode).body(response);
 	}
 	
 

@@ -6,6 +6,8 @@ import com.gorap.rideservice.auth.UserPrincipal;
 import com.gorap.rideservice.entity.User;
 import com.gorap.rideservice.request.LoginRequest;
 import com.gorap.rideservice.request.SignupRequest;
+import com.gorap.rideservice.request.TokenRefreshRequest;
+import com.gorap.rideservice.request.TokenRefreshResponse;
 import com.gorap.rideservice.response.JwtResponse;
 import com.gorap.rideservice.response.UserResponse;
 import com.gorap.rideservice.util.ResponseModel;
@@ -31,5 +33,9 @@ public interface AuthService {
 	ResponseModel<String> verifyOtp(String email, String otp);
 
 	ResponseModel<String> updatePassword(String email, String newPassword);
+
+	ResponseModel<TokenRefreshResponse> refreshToken(TokenRefreshRequest request);
+
+	ResponseModel<String> logoutAllDevices(UUID id);
 	
 }

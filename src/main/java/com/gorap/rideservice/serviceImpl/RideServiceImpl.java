@@ -368,6 +368,8 @@ public class RideServiceImpl implements RideService {
                 .destinationLatitude(dto.getDestinationLatitude())
                 .destinationLongitude(dto.getDestinationLongitude())
                 .rideDate(dto.getRideDate())
+                .rideStatus(dto.getRideStatus())
+                .vehicleType(dto.getVechicleType())
                 .rideTime(dto.getRideTime())
                 .availableSeats(dto.getAvailableSeats())
                 .viaPoints(viaPoints)

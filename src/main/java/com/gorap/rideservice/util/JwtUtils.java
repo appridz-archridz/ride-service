@@ -30,6 +30,9 @@ public class JwtUtils {
     @Value("${app.jwtExpirationMs:86400000}")
     private long jwtExpirationMs;
     
+    @Value("${app.jwtRefreshExpirationMs:604800000}")
+    private long refreshTokenExpirationMs;
+    
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
@@ -65,6 +68,18 @@ public class JwtUtils {
                 .getPayload()
                 .getSubject();
     }
+    
+    public String generateRefreshTokenFromEmail(String email, UUID userId) {
+        return Jwts.builder()
+                .subject(email) // ✅ EMAIL as main identifier
+                .claim("userId", userId.toString())
+                .claim("type", "REFRESH")
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(Instant.now().plus(refreshTokenExpirationMs, ChronoUnit.MILLIS)))
+                .signWith(getSigningKey())
+                .compact();
+    }
+    
     
     // New method to get UUID from token
     public UUID getUserIdFromJwtToken(String token) {
@@ -117,6 +132,15 @@ public class JwtUtils {
         }
         
         return false;
+    }
+    public String generateTokenFromEmail(String email) {
+        return Jwts.builder()
+                .subject(email) 
+                .claim("type", "ACCESS")
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(Instant.now().plus(jwtExpirationMs, ChronoUnit.MILLIS)))
+                .signWith(getSigningKey())
+                .compact();
     }
     
     public Claims getAllClaimsFromToken(String token) {

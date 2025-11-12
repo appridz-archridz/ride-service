@@ -1,5 +1,8 @@
 package com.gorap.rideservice.serviceImpl;
 
+
+
+
 import java.sql.Timestamp;
 import java.util.Optional;
 import java.util.Random;
@@ -19,17 +22,23 @@ import org.springframework.stereotype.Service;
 
 import com.gorap.rideservice.auth.UserPrincipal;
 import com.gorap.rideservice.constants.Role;
+import com.gorap.rideservice.entity.RefreshToken;
 import com.gorap.rideservice.entity.User;
+import com.gorap.rideservice.exception.TokenRefreshException;
 import com.gorap.rideservice.repository.UserRepository;
 import com.gorap.rideservice.request.LoginRequest;
 import com.gorap.rideservice.request.SignupRequest;
+import com.gorap.rideservice.request.TokenRefreshRequest;
+import com.gorap.rideservice.request.TokenRefreshResponse;
 import com.gorap.rideservice.response.JwtResponse;
 import com.gorap.rideservice.response.UserResponse;
 import com.gorap.rideservice.service.AuthService;
+import com.gorap.rideservice.service.RefreshTokenService;
 import com.gorap.rideservice.util.EmailService;
 import com.gorap.rideservice.util.JwtUtils;
 import com.gorap.rideservice.util.ResponseModel;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
@@ -50,6 +59,10 @@ public class AuthServiceImpl implements AuthService {
     
     @Autowired
     private EmailService emailService;
+    @Autowired
+    private RefreshTokenService refreshTokenService;
+    @Autowired
+    private HttpServletRequest request;
 
     /**
      * Authenticate user and generate JWT token
@@ -71,6 +84,22 @@ public class AuthServiceImpl implements AuthService {
 
             UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
 
+            String ipAddress = getClientIP();
+            String userAgent = request.getHeader("User-Agent");
+            
+            log.info("User login from IP: {}, Device: {}", ipAddress, userAgent);
+            
+            // STEP 4: Create refresh token
+            // WHAT IT DOES:
+            // - Checks if user has too many sessions (max 5)
+            // - If yes, revokes oldest session
+            // - Generates new JWT refresh token
+            // - Stores in database with IP/device info
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(
+                userPrincipal.getId(), 
+                ipAddress, 
+                userAgent
+            );
             JwtResponse jwtResponse = new JwtResponse(
                     jwt,
                     userPrincipal.getId(),
@@ -80,6 +109,16 @@ public class AuthServiceImpl implements AuthService {
                     userPrincipal.getAddress(),
                     userPrincipal.getUserRole()
             );
+
+            // ✅ STEP 5: Create response with BOTH tokens (UPDATED)
+         
+            
+            // STEP 6: Add refresh token to response
+            jwtResponse.setRefreshToken(refreshToken.getToken());  // ✅ NEW!
+
+            response.setData(jwtResponse);
+            response.setStatusCode(HttpStatus.OK.toString());
+            response.setMessage("User authenticated successfully");
 
             response.setData(jwtResponse);
             response.setSuccess(true);
@@ -381,7 +420,98 @@ public class AuthServiceImpl implements AuthService {
 	        return response;
 	    }
 	}
+	
+	 public ResponseModel<TokenRefreshResponse> refreshToken(TokenRefreshRequest tokenRequest) {
+	        ResponseModel<TokenRefreshResponse> response = new ResponseModel<>();
+	        String requestRefreshToken = tokenRequest.getRefreshToken();
+	        
+	        try {
+	            // ✅ STEP 1: Validate JWT format
 
+
+	            
+	            // ✅ STEP 3: Find refresh token in database
+	            RefreshToken refreshToken = refreshTokenService.findByToken(requestRefreshToken)
+	                    .map(refreshTokenService::verifyExpiration)  // Verify not expired/revoked
+	                    .orElseThrow(() -> new TokenRefreshException(requestRefreshToken, 
+	                        "Refresh token not found in database"));
+	            
+	            // ✅ STEP 4: Get user from token
+	            User user = refreshToken.getUser();
+	            
+	            log.info("Refreshing token for user: {}", user.getEmail());
+	            
+	            // ✅ STEP 5: Generate new ACCESS token
+	            // WHY generateTokenFromEmail: We only have email, not full Authentication object
+	            String newAccessToken = jwtUtils.generateTokenFromEmail(user.getEmail());
+	            
+	            // ✅ STEP 6: Generate new REFRESH token (TOKEN ROTATION - More Secure)
+	            // WHY: If old token was stolen, it becomes invalid immediately
+	            String ipAddress = getClientIP();
+	            String userAgent = request.getHeader("Usr-Agent");
+	            
+	            RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(
+	                user.getId(), 
+	                ipAddress, 
+	                userAgent
+	            );
+	            
+	            // ✅ STEP 7: Revoke old refresh token
+	            // IMPORTANT: Old token can't be used anymore
+	            refreshTokenService.revokeToken(requestRefreshToken);
+	            
+	            log.info("Token refreshed successfully for user: {}", user.getEmail());
+	            
+	            // ✅ STEP 8: Create response with new tokens
+	            TokenRefreshResponse tokenResponse = new TokenRefreshResponse(
+	                newAccessToken,              // New access token (15 min)
+	                newRefreshToken.getToken()   // New refresh token (7 days)
+	            );
+	            
+	            response.setData(tokenResponse);
+	            response.setStatusCode(HttpStatus.OK.toString());
+	            response.setMessage("Token refreshed successfully");
+	            
+	        } catch (Exception e) {
+	            log.error("Error refreshing token", e);
+	            response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.toString());
+	            response.setMessage("Failed to refresh token. Please login again.");
+	        }
+	        
+	        return response;
+	    }
+
+	    private String getClientIP() {
+	        // Check if behind proxy/load balancer
+	        String xfHeader = request.getHeader("X-Forwarded-For");
+	        
+	        if (xfHeader == null) {
+	            // Direct connection
+	            return request.getRemoteAddr();
+	        }
+	        
+	        // Behind proxy - get first IP (real client IP)
+	        // Format: "client_ip, proxy1_ip, proxy2_ip"
+	        return xfHeader.split(",")[0];
+	    }
+	    
+	    public ResponseModel<String> logoutAllDevices(UUID userId) {
+	        ResponseModel<String> response = new ResponseModel<>();
+	        try {
+	            refreshTokenService.revokeAllUserTokens(userId);
+	            
+	            log.info("User logged out from all devices: {}", userId);
+	            
+	            response.setStatusCode(HttpStatus.OK.toString());
+	            response.setMessage("Logged out from all devices successfully");
+	            
+	        } catch (Exception e) {
+	            log.error("Error during logout all devices", e);
+	            response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.toString());
+	            response.setMessage("Logout failed");
+	        }
+	        return response;
+	    }
 	
 
 
