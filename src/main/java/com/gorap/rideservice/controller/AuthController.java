@@ -127,7 +127,7 @@ public class AuthController {
 
 			JwtResponse jwtResponse = new JwtResponse(newToken, currentUser.getId(), currentUser.getUsername(),
 					currentUser.getEmail(), currentUser.getPhoneNumber(), currentUser.getAddress(),
-					currentUser.getUserRole());
+					currentUser.getUserRole(), currentUser.getProfilePic());
 
 			return ResponseEntity.ok(jwtResponse);
 		} catch (Exception e) {

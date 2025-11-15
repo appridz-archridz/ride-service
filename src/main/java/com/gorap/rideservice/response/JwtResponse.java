@@ -19,9 +19,10 @@ public class JwtResponse {
     private String phoneNumber;
     private String address;
     private Role role;
+    private String profilePic;
     
     public JwtResponse(String accessToken, UUID id, String userName, String email, 
-                      String phoneNumber, String address, Role role) {
+                      String phoneNumber, String address, Role role, String profilePic) {
         this.token = accessToken;
         this.id = id;
         this.userName = userName;
@@ -29,5 +30,6 @@ public class JwtResponse {
         this.phoneNumber = phoneNumber;
         this.address = address;
         this.role = role;
+        this.profilePic = profilePic;
     }
 }
