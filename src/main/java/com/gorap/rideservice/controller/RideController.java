@@ -60,7 +60,6 @@ public class RideController {
            return ResponseEntity.status(httpStatus).body(response);
     }
     
-    
     @GetMapping("/debug/{rideId}")
     public ResponseEntity<?> debugRide(@PathVariable String rideId) {
         CreateRide ride = rideRepository.findById(UUID.fromString(rideId)).orElse(null);

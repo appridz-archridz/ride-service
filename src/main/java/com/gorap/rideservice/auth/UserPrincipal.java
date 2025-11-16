@@ -20,6 +20,7 @@ public class UserPrincipal implements UserDetails {
 	private String email;
 	private String phoneNumber;
 	private String address;
+	private String profilePic;
 
 	@JsonIgnore
 	private String password;
@@ -27,7 +28,7 @@ public class UserPrincipal implements UserDetails {
 	private Collection<? extends GrantedAuthority> authorities;
 
 	public UserPrincipal(UUID id, String userName, String email, String phoneNumber, String address, String password,
-			Collection<? extends GrantedAuthority> authorities) {
+			Collection<? extends GrantedAuthority> authorities, String profilePic) {
 		this.id = id;
 		this.userName = userName;
 		this.email = email;
@@ -35,6 +36,7 @@ public class UserPrincipal implements UserDetails {
 		this.address = address;
 		this.password = password;
 		this.authorities = authorities;
+		this.profilePic = profilePic;
 	}
 
 	/**
@@ -51,7 +53,8 @@ public class UserPrincipal implements UserDetails {
 				user.getPhoneNumber(), // phoneNumber
 				user.getAddress(), // address
 				user.getPassword(), // password
-				Collections.singletonList(authority) // Single role as list
+				Collections.singletonList(authority), // Single role as list
+				user.getProfilePic()
 		);
 	}
 
@@ -90,6 +93,10 @@ public class UserPrincipal implements UserDetails {
 	@Override
 	public Collection<? extends GrantedAuthority> getAuthorities() {
 		return authorities;
+	}
+	
+	public String getProfilePic() {
+		return profilePic;
 	}
 
 	@Override
