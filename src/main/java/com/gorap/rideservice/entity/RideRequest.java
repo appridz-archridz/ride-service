@@ -4,7 +4,11 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
 
+import com.gorap.rideservice.constants.RideStatus;
+
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
@@ -29,15 +33,14 @@ public class RideRequest  extends BaseEntity{
     private LocalTime rideTime;
 
     private Double offeredPrice;
-//    private Double acceptedPrice;
 
-//    @Enumerated(EnumType.STRING)
-//    private RideStatus status = RideStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    private RideStatus rideStatus;
 
 
     private UUID driverId;  
     private String polyline;
-    private String vehicleType;
     private Double distanceKm;
     private String duration;
     private int numberOfPassengers;
