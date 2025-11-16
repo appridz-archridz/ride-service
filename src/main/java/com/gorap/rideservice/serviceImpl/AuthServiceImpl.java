@@ -107,7 +107,8 @@ public class AuthServiceImpl implements AuthService {
                     userPrincipal.getEmail(),
                     userPrincipal.getPhoneNumber(),
                     userPrincipal.getAddress(),
-                    userPrincipal.getUserRole()
+                    userPrincipal.getUserRole(),
+                    userPrincipal.getProfilePic()
             );
 
             // ✅ STEP 5: Create response with BOTH tokens (UPDATED)
