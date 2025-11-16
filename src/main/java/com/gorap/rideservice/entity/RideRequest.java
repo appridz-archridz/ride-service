@@ -12,11 +12,13 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 
 @Entity
 @Table(name = "ride_request",schema="ride")
 @Getter
 @Setter
+@ToString
 public class RideRequest  extends BaseEntity{
 
     

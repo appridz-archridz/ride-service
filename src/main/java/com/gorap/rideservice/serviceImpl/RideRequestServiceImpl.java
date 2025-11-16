@@ -127,7 +127,7 @@ public class RideRequestServiceImpl implements RideRequestService {
         ResponseModel<RideRequest> response = new ResponseModel<>();
 
         try {
-            // 1. Fetch existing ride
+          System.out.println("ride Request"+ updatedRideRequest);
             RideRequest existingRide = rideRequestRepository.findById(rideId)
                     .orElse(null);
 
@@ -163,6 +163,7 @@ public class RideRequestServiceImpl implements RideRequestService {
             existingRide.setOfferedPrice(updatedRideRequest.getOfferedPrice());
             existingRide.setDistanceKm(updatedRideRequest.getDistanceKm());
             existingRide.setDuration(updatedRideRequest.getDuration());
+            existingRide.setRideStatus(RideStatus.open);
             existingRide.setNumberOfPassengers(updatedRideRequest.getNumberOfPassengers());
 
             existingRide.setPolyline(updatedRideRequest.getPolyline());

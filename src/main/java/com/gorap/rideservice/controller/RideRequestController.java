@@ -97,7 +97,7 @@ public class RideRequestController {
     }
     
     
-    @GetMapping("/{rideId}")
+    @GetMapping("/get/{rideId}")
     public ResponseEntity<ResponseModel<RideRequest>> getRideById(
             @PathVariable UUID rideId) {
 
