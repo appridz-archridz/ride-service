@@ -152,10 +152,10 @@ public class AuthController {
 	    log.info("Begin User Authentication Controller -> updatePassword() method");
 	    ResponseModel<String> response = authService.updatePassword(email, password);
 	    log.info("End User Authentication Controller -> updatePassword() method");
-
 	    HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
 	    return ResponseEntity.status(httpStatus).body(response);
 	}
+
 
 
 	@PostMapping("/refresh-token")
