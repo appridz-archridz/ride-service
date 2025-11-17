@@ -1,5 +1,7 @@
 package com.gorap.rideservice.response;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.UUID;
 
 public interface CreateRideProjection {
@@ -7,5 +9,6 @@ public interface CreateRideProjection {
     String getSource();
     String getDestination();
     String getStatus();
-//    Timestamp getCreatedOn();
+    LocalDate getCreatedDate();
+    LocalTime getRideTime();
 }

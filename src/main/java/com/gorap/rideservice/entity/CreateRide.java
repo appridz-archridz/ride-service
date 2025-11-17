@@ -8,6 +8,7 @@ import com.gorap.rideservice.constants.RideStatus;
 import com.gorap.rideservice.constants.VehicleType;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -48,6 +49,7 @@ public class CreateRide extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private VehicleType vehicleType;
     
+    @Column(columnDefinition = "TEXT")
     private String polyline;
 
     private Double distanceKm; // Distance in km from OSRM
