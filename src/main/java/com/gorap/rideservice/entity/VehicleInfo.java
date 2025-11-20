@@ -4,6 +4,8 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 import java.time.LocalDate;
 
+import com.gorap.rideservice.constants.VehicleType;
+
 @Entity
 @Table(name = "vehicle_info")
 @Data
@@ -11,8 +13,10 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class VehicleInfo  extends BaseEntity{
-
-
+	
+	@NotBlank
+	@Column(name="vehicle_type")
+	private VehicleType vehicleTpe;
 
     @NotBlank
     @Column(name = "vehicle_number")
