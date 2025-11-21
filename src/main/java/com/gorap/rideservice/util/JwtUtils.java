@@ -27,10 +27,10 @@ public class JwtUtils {
     @Value("${app.jwtSecret:mySecretKey}")
     private String jwtSecret;
     
-    @Value("${app.jwtExpirationMs:86400000}")
+    @Value("${app.jwtExpirationMs:900000}")         // 15 minutes
     private long jwtExpirationMs;
-    
-    @Value("${app.jwtRefreshExpirationMs:604800000}")
+
+    @Value("${app.jwtRefreshExpirationMs:604800000}") // 7 days
     private long refreshTokenExpirationMs;
     
     private SecretKey getSigningKey() {
@@ -113,11 +113,13 @@ public class JwtUtils {
     }
     
     public boolean validateJwtToken(String authToken) {
+    	System.out.println("auth");
         try {
-            Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(authToken);
+        	Claims claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(authToken)
+                    .getPayload();
             return true;
         } catch (MalformedJwtException e) {
             System.err.println("Invalid JWT token: " + e.getMessage());
