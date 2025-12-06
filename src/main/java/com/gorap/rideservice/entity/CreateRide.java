@@ -3,11 +3,13 @@ package com.gorap.rideservice.entity;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.UUID;
 
 import com.gorap.rideservice.constants.RideStatus;
 import com.gorap.rideservice.constants.VehicleType;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -44,6 +46,9 @@ public class CreateRide extends BaseEntity {
     
     @Enumerated(EnumType.STRING)
     private RideStatus rideStatus;
+    
+    @Column(name="vehicle_id")
+    private UUID vehicleId;
     
     @Enumerated(EnumType.STRING)
     private VehicleType vehicleType;

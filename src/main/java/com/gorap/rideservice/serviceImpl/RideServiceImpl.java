@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.gorap.rideservice.constants.RideStatus;
 import com.gorap.rideservice.entity.CreateRide;
 import com.gorap.rideservice.entity.ViaPoints;
 import com.gorap.rideservice.exception.RecordNotFoundException;
@@ -371,8 +372,10 @@ public class RideServiceImpl implements RideService {
                 .destinationLongitude(dto.getDestinationLongitude())
                 .rideDate(dto.getRideDate())
                 .rideStatus(dto.getRideStatus())
+                .vehicleId(dto.getVehicleId())
                 .vehicleType(dto.getVechicleType())
                 .rideTime(dto.getRideTime())
+                .rideStatus(RideStatus.open)
                 .availableSeats(dto.getAvailableSeats())
                 .viaPoints(viaPoints)
                 .build();
