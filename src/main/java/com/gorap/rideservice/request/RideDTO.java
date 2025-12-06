@@ -32,7 +32,7 @@ public class RideDTO {
     private LocalDate rideDate;
     private LocalTime rideTime;
     
-    private  VehicleType vechicleType;
+    private  VehicleType vehicleType;
     private UUID vehicleId;
     private RideStatus rideStatus;
 

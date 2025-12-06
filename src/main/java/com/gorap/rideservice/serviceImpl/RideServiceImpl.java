@@ -157,7 +157,7 @@ public class RideServiceImpl implements RideService {
     }
     
     public static boolean isRouteMatching(String polyline, double startLat, double startLng, double endLat, double endLng) {
-    	log.info("Begin RideServiceImpl -> isRouteMatching()" + polyline);
+//    	log.info("Begin RideServiceImpl -> isRouteMatching()" + polyline);
         String[] points = polyline.split(";");
         boolean sourceFound = false;
         double tolerance = 0.001;
@@ -373,7 +373,7 @@ public class RideServiceImpl implements RideService {
                 .rideDate(dto.getRideDate())
                 .rideStatus(dto.getRideStatus())
                 .vehicleId(dto.getVehicleId())
-                .vehicleType(dto.getVechicleType())
+                .vehicleType(dto.getVehicleType())
                 .rideTime(dto.getRideTime())
                 .rideStatus(RideStatus.open)
                 .availableSeats(dto.getAvailableSeats())

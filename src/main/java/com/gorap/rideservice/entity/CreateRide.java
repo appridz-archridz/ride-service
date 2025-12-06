@@ -53,6 +53,7 @@ public class CreateRide extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private VehicleType vehicleType;
     
+    @Column(columnDefinition = "TEXT")
     private String polyline;
 
     private Double distanceKm; // Distance in km from OSRM

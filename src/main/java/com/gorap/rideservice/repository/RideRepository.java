@@ -77,7 +77,9 @@ public interface RideRepository extends JpaRepository<CreateRide, UUID> {
 		        id AS id,
 		        start_point AS source,
 		        destination_point AS destination,
-		        'ACTIVE' AS status
+		        'ACTIVE' AS status,
+		        ride_date AS createdDate,
+		        ride_time AS rideTime
 		    FROM ride.create_ride
 		    WHERE created_by = :userId
 		""", nativeQuery = true)

@@ -31,10 +31,8 @@ public class VehicleInfoServiceImpl implements VehicleInfoService {
     }
 
     @Override
-    @Transactional
     public ResponseModel<VehicleInfo> createVehicle(UUID userId, VehicleInfo vehicleInfo) {
         log.info("Begin VehicleInfoService -> createVehicle() for user: {}", userId);
-
         ResponseModel<VehicleInfo> response = new ResponseModel<>();
 
         try {

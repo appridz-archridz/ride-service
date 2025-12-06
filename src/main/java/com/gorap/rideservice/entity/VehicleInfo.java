@@ -4,27 +4,26 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 import java.time.LocalDate;
 
+import com.gorap.rideservice.constants.VehicleType;
+
 @Entity
-@Table(name = "vehicle_info")
+@Table(name = "vehicle_info", schema = "ride")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class VehicleInfo  extends BaseEntity{
+	
+	@Column(name="vehicle_type")
+	@Enumerated(EnumType.STRING)
+	private VehicleType vehicleType;
 
-
-
-    @NotBlank
     @Column(name = "vehicle_number")
     private String vehicleNumber;
 
-
-    @NotBlank
     @Column(name = "dl_number")
     private String dlNumber;
 
-  
-    @NotNull
     @Column(name = "dl_expiry")
     private LocalDate dlExpiry;
 
