@@ -18,6 +18,7 @@ public class JwtResponse {
     private String email;
     private String phoneNumber;
     private String address;
+    private String refreshToken;
     private Role role;
     private String profilePic;
     

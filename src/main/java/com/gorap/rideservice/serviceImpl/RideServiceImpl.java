@@ -2,9 +2,7 @@ package com.gorap.rideservice.serviceImpl;
 
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -12,15 +10,18 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.gorap.rideservice.constants.RideStatus;
 import com.gorap.rideservice.entity.CreateRide;
 import com.gorap.rideservice.entity.ViaPoints;
+import com.gorap.rideservice.exception.RecordNotFoundException;
 import com.gorap.rideservice.repository.RideRepository;
 import com.gorap.rideservice.request.RideDTO;
+import com.gorap.rideservice.request.RideUpdateDto;
 import com.gorap.rideservice.request.SearchRideDTO;
+import com.gorap.rideservice.response.CreateRideProjection;
 import com.gorap.rideservice.response.RideDetailsProjection;
 import com.gorap.rideservice.service.RideService;
 import com.gorap.rideservice.util.ResponseModel;
-import com.gorap.rideservice.util.RoutingService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,12 +32,9 @@ import lombok.extern.slf4j.Slf4j;
 public class RideServiceImpl implements RideService {
 
     private final RideRepository rideRepository;
-    private final RoutingService routingService;
 
     // Configuration constants
     private static final double TOLERANCE_KM = 2.0; // Distance tolerance for route matching
-    private static final double STRICT_TOLERANCE_KM = 0.5; // For exact start/end matching
-    private static final double MAX_DETOUR_RATIO = 3.0; // Maximum allowed detour ratio
     private static final double MIN_TRIP_DISTANCE_KM = 0.5; // Minimum viable trip distance
     private static final double SEARCH_RADIUS_KM = 50.0; // Search bounding box radius
     private static final int EARTH_RADIUS_KM = 6371; // Earth radius for Haversine formula
@@ -159,7 +157,7 @@ public class RideServiceImpl implements RideService {
     }
     
     public static boolean isRouteMatching(String polyline, double startLat, double startLng, double endLat, double endLng) {
-    	log.info("Begin RideServiceImpl -> isRouteMatching()" + polyline);
+//    	log.info("Begin RideServiceImpl -> isRouteMatching()" + polyline);
         String[] points = polyline.split(";");
         boolean sourceFound = false;
         double tolerance = 0.001;
@@ -373,7 +371,11 @@ public class RideServiceImpl implements RideService {
                 .destinationLatitude(dto.getDestinationLatitude())
                 .destinationLongitude(dto.getDestinationLongitude())
                 .rideDate(dto.getRideDate())
+                .rideStatus(dto.getRideStatus())
+                .vehicleId(dto.getVehicleId())
+                .vehicleType(dto.getVehicleType())
                 .rideTime(dto.getRideTime())
+                .rideStatus(RideStatus.open)
                 .availableSeats(dto.getAvailableSeats())
                 .viaPoints(viaPoints)
                 .build();
@@ -538,4 +540,60 @@ public class RideServiceImpl implements RideService {
 
         return response;
     }
+    
+    @Override
+    public ResponseModel<List<CreateRideProjection>> getRidesByUser(UUID userId) {
+        log.info("Fetching rides created by user ID: {}", userId);
+        ResponseModel<List<CreateRideProjection>> response = new ResponseModel<>();
+
+        try {
+            var rides = rideRepository.findRidesByCreatedBy(userId);
+            if (rides.isEmpty()) {
+                response.setStatusCode(String.valueOf(HttpStatus.NOT_FOUND.value()));
+                response.setMessage("No rides found for user ID: " + userId);
+                return response;
+            }
+
+            response.setStatusCode(String.valueOf(HttpStatus.OK.value()));
+            response.setMessage("Rides fetched successfully");
+            response.setData(rides);
+        } catch (Exception e) {
+            log.error("Error fetching rides by user: ", e);
+            response.setStatusCode(String.valueOf(HttpStatus.INTERNAL_SERVER_ERROR.value()));
+            response.setMessage("Failed to fetch rides: " + e.getMessage());
+        }
+
+        return response;
+    }
+
+    @Override
+    public ResponseModel<CreateRide> updateStatus(RideUpdateDto rideUpdate) {
+        ResponseModel<CreateRide> response = new ResponseModel<>();
+
+        try {
+            CreateRide createRide = rideRepository.findById(rideUpdate.getId())
+                    .orElseThrow(() -> new RecordNotFoundException("Ride ID not found to update the status"));
+
+            createRide.setRideStatus(rideUpdate.getRideStatus());
+            createRide.setAvailableSeats(rideUpdate.getAvailableSeats());
+
+            CreateRide savedRide = rideRepository.save(createRide);
+
+            response.setData(savedRide);
+            response.setStatusCode(HttpStatus.OK.toString());
+            response.setMessage("Ride updated successfully");
+
+        } catch (RecordNotFoundException e) {
+            log.error("Ride not found: ", e);
+            response.setStatusCode(HttpStatus.NOT_FOUND.toString());
+            response.setMessage(e.getMessage());
+        } catch (Exception e) {
+            log.error("Error updating ride: ", e);
+            response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.toString());
+            response.setMessage("Failed to update ride: " + e.getMessage());
+        }
+
+        return response;
+    }
+
 }

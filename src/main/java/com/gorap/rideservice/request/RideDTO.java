@@ -5,6 +5,9 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
+import com.gorap.rideservice.constants.RideStatus;
+import com.gorap.rideservice.constants.VehicleType;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,6 +31,10 @@ public class RideDTO {
 
     private LocalDate rideDate;
     private LocalTime rideTime;
+    
+    private  VehicleType vehicleType;
+    private UUID vehicleId;
+    private RideStatus rideStatus;
 
     private Integer availableSeats;
     

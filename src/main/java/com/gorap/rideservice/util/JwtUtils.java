@@ -27,8 +27,11 @@ public class JwtUtils {
     @Value("${app.jwtSecret:mySecretKey}")
     private String jwtSecret;
     
-    @Value("${app.jwtExpirationMs:86400000}")
+    @Value("${app.jwtExpirationMs:900000}")         // 15 minutes
     private long jwtExpirationMs;
+
+    @Value("${app.jwtRefreshExpirationMs:604800000}") // 7 days
+    private long refreshTokenExpirationMs;
     
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
@@ -66,6 +69,18 @@ public class JwtUtils {
                 .getSubject();
     }
     
+    public String generateRefreshTokenFromEmail(String email, UUID userId) {
+        return Jwts.builder()
+                .subject(email) // ✅ EMAIL as main identifier
+                .claim("userId", userId.toString())
+                .claim("type", "REFRESH")
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(Instant.now().plus(refreshTokenExpirationMs, ChronoUnit.MILLIS)))
+                .signWith(getSigningKey())
+                .compact();
+    }
+    
+    
     // New method to get UUID from token
     public UUID getUserIdFromJwtToken(String token) {
         String userIdStr = Jwts.parser()
@@ -98,11 +113,13 @@ public class JwtUtils {
     }
     
     public boolean validateJwtToken(String authToken) {
+    	System.out.println("auth");
         try {
-            Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(authToken);
+        	Claims claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(authToken)
+                    .getPayload();
             return true;
         } catch (MalformedJwtException e) {
             System.err.println("Invalid JWT token: " + e.getMessage());
@@ -117,6 +134,15 @@ public class JwtUtils {
         }
         
         return false;
+    }
+    public String generateTokenFromEmail(String email) {
+        return Jwts.builder()
+                .subject(email) 
+                .claim("type", "ACCESS")
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(Instant.now().plus(jwtExpirationMs, ChronoUnit.MILLIS)))
+                .signWith(getSigningKey())
+                .compact();
     }
     
     public Claims getAllClaimsFromToken(String token) {

@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,7 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.gorap.rideservice.entity.CreateRide;
 import com.gorap.rideservice.repository.RideRepository;
 import com.gorap.rideservice.request.RideDTO;
+import com.gorap.rideservice.request.RideUpdateDto;
 import com.gorap.rideservice.request.SearchRideDTO;
+import com.gorap.rideservice.response.CreateRideProjection;
 import com.gorap.rideservice.response.RideDetailsProjection;
 import com.gorap.rideservice.service.RideService;
 import com.gorap.rideservice.util.HttpStatusCode;
@@ -77,6 +80,27 @@ public class RideController {
         ResponseModel<RideDetailsProjection> response = rideService.getRideDetails(rideId);
         HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
         log.info("End RideController -> getRideDetails()");
+        return ResponseEntity.status(httpStatus).body(response);
+    }
+    
+    
+    @PatchMapping("/update-status")
+    public ResponseEntity<ResponseModel<CreateRide>> updateStatus(@RequestBody RideUpdateDto rideUpdate
+            ) {
+
+        log.info("Begin RideController -> updateStatus()");
+        ResponseModel<CreateRide> response = rideService.updateStatus(rideUpdate);
+        HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+        log.info("End RideController -> updateStatus()");
+        return ResponseEntity.status(httpStatus).body(response);
+    }
+    
+    @GetMapping("/get/by-user/{userId}")
+    public ResponseEntity<ResponseModel<List<CreateRideProjection>>> getRidesByUser(@PathVariable UUID userId) {
+        log.info("Begin RideController -> getRidesByUser()");
+        ResponseModel<List<CreateRideProjection>> response = rideService.getRidesByUser(userId);
+        HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+        log.info("End RideController -> getRidesByUser()");
         return ResponseEntity.status(httpStatus).body(response);
     }
     

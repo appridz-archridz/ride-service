@@ -2,14 +2,18 @@ package com.gorap.rideservice.entity;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.UUID;
+
+import com.gorap.rideservice.constants.RideStatus;
+import com.gorap.rideservice.constants.VehicleType;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -39,7 +43,17 @@ public class CreateRide extends BaseEntity {
     private LocalTime rideTime;
 
     private Integer availableSeats;
-
+    
+    @Enumerated(EnumType.STRING)
+    private RideStatus rideStatus;
+    
+    @Column(name="vehicle_id")
+    private UUID vehicleId;
+    
+    @Enumerated(EnumType.STRING)
+    private VehicleType vehicleType;
+    
+    @Column(columnDefinition = "TEXT")
     private String polyline;
 
     private Double distanceKm; // Distance in km from OSRM

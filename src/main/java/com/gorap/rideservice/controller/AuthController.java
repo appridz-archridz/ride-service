@@ -1,21 +1,27 @@
 package com.gorap.rideservice.controller;
 
+import java.util.UUID;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.gorap.rideservice.auth.UserPrincipal;
 import com.gorap.rideservice.entity.User;
 import com.gorap.rideservice.request.LoginRequest;
 import com.gorap.rideservice.request.SignupRequest;
+import com.gorap.rideservice.request.TokenRefreshRequest;
+import com.gorap.rideservice.request.TokenRefreshResponse;
 import com.gorap.rideservice.response.JwtResponse;
 import com.gorap.rideservice.response.MessageResponse;
 import com.gorap.rideservice.response.UserResponse;
@@ -113,27 +119,69 @@ public class AuthController {
 	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseModel);
 		}
 	}
+	
+	@PostMapping("/forgot-password")
+	public ResponseEntity<String> forgotPassword(@RequestParam String email) throws Exception {
+		log.info("Begin User Authentication Controller -> forgotPassword() method");
+		authService.forgotPassword(email);
+		log.info("End User Authentication Controller -> forgotPassword() method");
+		return ResponseEntity.ok("Password reset link sent to your email");
+	}
+	
+	@PostMapping("/verify-otp")
+    public ResponseEntity<ResponseModel<String>> verifyOtp(
+            @RequestParam String email,
+            @RequestParam String otp) {
+		log.info("Begin User Authentication Controller -> forgotPassword() method");
+		ResponseModel<String> response=authService.verifyOtp(email, otp);
+		log.info("End User Authentication Controller -> forgotPassword() method");
+        HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+		return ResponseEntity.status(httpStatus).body(response);
+    }
 
 	@PostMapping("/logout")
 	public ResponseEntity<?> logoutUser() {
 		return ResponseEntity.ok(new MessageResponse("User logged out successfully!"));
 	}
+	
+	@PatchMapping("/update-password")
+	public ResponseEntity<ResponseModel<String>> updatePassword(
+	        @RequestParam String email,
+	        @RequestParam String password) {
 
-	@PostMapping("/refresh")
-	public ResponseEntity<?> refreshToken(@AuthenticationPrincipal UserPrincipal currentUser) {
-		try {
-			// Generate new token for current user
-			String newToken = authService.generateTokenForUser(currentUser);
-
-			JwtResponse jwtResponse = new JwtResponse(newToken, currentUser.getId(), currentUser.getUsername(),
-					currentUser.getEmail(), currentUser.getPhoneNumber(), currentUser.getAddress(),
-					currentUser.getUserRole(), currentUser.getProfilePic());
-
-			return ResponseEntity.ok(jwtResponse);
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(new MessageResponse("Error refreshing token!", false));
-		}
+	    log.info("Begin User Authentication Controller -> updatePassword() method");
+	    ResponseModel<String> response = authService.updatePassword(email, password);
+	    log.info("End User Authentication Controller -> updatePassword() method");
+	    HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+	    return ResponseEntity.status(httpStatus).body(response);
 	}
+
+
+
+	@PostMapping("/refresh-token")
+	public ResponseEntity<ResponseModel<TokenRefreshResponse>> refreshToken(
+			 @RequestBody TokenRefreshRequest request) {
+		
+		log.info("Token refresh request received");
+		
+		ResponseModel<TokenRefreshResponse> response = authService.refreshToken(request);
+		HttpStatus httpStatusFromCode = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+		
+		return ResponseEntity.status(httpStatusFromCode).body(response);
+	}
+	
+	@PostMapping("/logout-all/{id}")
+	public ResponseEntity<ResponseModel<String>> logoutAllDevices(
+			@PathVariable UUID id) {
+		
+		log.info("Logout all devices request for user: {}", id);
+		
+		ResponseModel<String> response = authService.logoutAllDevices(id);
+		HttpStatus httpStatusFromCode = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+		
+		return ResponseEntity.status(httpStatusFromCode).body(response);
+	}
+	
+
 	
 }
