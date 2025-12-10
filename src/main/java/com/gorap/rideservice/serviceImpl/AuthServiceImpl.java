@@ -514,7 +514,39 @@ public class AuthServiceImpl implements AuthService {
 	        return response;
 	    }
 	
-
+	    public ResponseModel<Boolean> isEmailExists(String email) {
+	    	log.info("Begin AuthServiceImpl -> isEmailExists()");
+	    	ResponseModel<Boolean> response = new ResponseModel<Boolean>();
+	    	try {
+	    		if (email.trim().length() == 0) {
+	    			response.setStatusCode(HttpStatus.BAD_REQUEST.toString());
+	    			response.setMessage("Email is empty");
+	    			response.setData(false);
+	    			response.setSuccess(false);
+	    			return response;
+	    		}
+	    		boolean exists = userRepository.existsByEmail(email); 
+	    		if (!exists) {
+	    			System.out.println("exists is :: " + exists);
+	    			response.setStatusCode(HttpStatus.NOT_FOUND.toString());
+	    			response.setMessage("User not found!");
+	    			response.setData(false);
+	    			response.setSuccess(false);
+	    		} else {
+	    			response.setStatusCode(HttpStatus.FOUND.toString());
+	    			response.setMessage("User Found!");
+	    			response.setData(true);
+	    			response.setSuccess(true);
+	    		}
+	    	} catch (Exception e) {
+	    		 log.error("Error during logout all devices", e);
+	            response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.toString());
+	            response.setMessage("Something went wrong!");
+    			response.setData(false);
+    			response.setSuccess(false);
+	    	}
+	    	return response;
+	    }
 
 }
 

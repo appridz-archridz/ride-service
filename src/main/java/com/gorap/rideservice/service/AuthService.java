@@ -38,4 +38,6 @@ public interface AuthService {
 
 	ResponseModel<String> logoutAllDevices(UUID id);
 	
+	ResponseModel<Boolean> isEmailExists(String email);
+	
 }

@@ -30,6 +30,7 @@ import com.gorap.rideservice.util.HttpStatusCode;
 import com.gorap.rideservice.util.ResponseModel;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -182,6 +183,18 @@ public class AuthController {
 		return ResponseEntity.status(httpStatusFromCode).body(response);
 	}
 	
+	@GetMapping("/is-email-exists")
+	public ResponseEntity<ResponseModel<Boolean>> isEmailExists(@RequestParam String email) {
+		
+		log.info("Begin AuthController -> isEmailExists()");
+		
+		ResponseModel<Boolean> response = authService.isEmailExists(email);
+		HttpStatus httpStatusFromCode = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+		
+		log.info("End AuthController -> isEmailExists()" + response.getStatusCode());
 
+		return ResponseEntity.status(httpStatusFromCode).body(response);
+
+	}
 	
 }
