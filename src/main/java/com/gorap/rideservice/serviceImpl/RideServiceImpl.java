@@ -532,7 +532,7 @@ public class RideServiceImpl implements RideService {
             response.setStatusCode(String.valueOf(HttpStatus.OK.value()));
             response.setMessage("Ride details fetched successfully");
             response.setData(rideDetailsOpt.get());
-        } catch (Exception e) {
+        } catch (Exception e) { 
             log.error("Error fetching ride details: ", e);
             response.setStatusCode(String.valueOf(HttpStatus.INTERNAL_SERVER_ERROR.value()));
             response.setMessage("Failed to fetch ride details: " + e.getMessage());

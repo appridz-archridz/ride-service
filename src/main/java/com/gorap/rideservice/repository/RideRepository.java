@@ -51,19 +51,27 @@ public interface RideRepository extends JpaRepository<CreateRide, UUID> {
 	
 	
     @Query(value = """
-            SELECT 
-                r.id AS id,
-                u.phone_number AS phoneNumber,
-                u.profile_pic AS profilePic,
-                u.user_name AS userName,
-                r.ride_date AS rideDate,
-                r.ride_time AS rideTime,
-                r.distance_km AS distanceKm,
-                r.start_point AS startPoint,
-                r.destination_point AS destinationPoint
-            FROM ride.create_ride r
-            LEFT JOIN identity.users u ON u.id = r.created_by
-            WHERE r.id = :rideId
+			SELECT
+			    r.id AS id,
+			    u.phone_number AS phoneNumber,
+			    u.profile_pic AS profilePic,
+			    u.user_name AS userName,
+			    r.ride_date AS rideDate,
+			    r.ride_time AS rideTime,
+			    r.distance_km AS distanceKm,
+			    r.start_point AS startPoint,
+			    r.start_latitude AS startLatitude,
+			    r.start_longitude AS startLongitude,
+			    r.destination_point AS destinationPoint,
+			    r.destination_latitude AS destinationLatitude,
+			    r.destination_longitude AS destinationLongitude,
+			    v.vehicle_number AS vehicleNumber,
+			    v.vehicle_type AS vehicleType,
+			    r.vehicle_id AS vehicleId
+			FROM ride.create_ride r
+			LEFT JOIN identity.users u ON u.id = r.created_by
+			LEFT JOIN ride.vehicle_info v ON v.id = r.vehicle_id
+			WHERE r.id = :rideId;
         """, nativeQuery = true)
         Optional<RideDetailsProjection> findRideDetailsById(UUID rideId);
 
