@@ -20,4 +20,6 @@ public interface RideService {
 	ResponseModel<List<CreateRideProjection>> getRidesByUser(UUID userId);
 
 	ResponseModel<CreateRide> updateStatus(RideUpdateDto rideUpdate);
+
+	ResponseModel<CreateRide> updateRide(UUID rideId, RideDTO rideDTO);
 }
