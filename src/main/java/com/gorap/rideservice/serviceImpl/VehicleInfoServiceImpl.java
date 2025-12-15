@@ -115,6 +115,9 @@ public class VehicleInfoServiceImpl implements VehicleInfoService {
             VehicleInfo existing = existingOpt.get();
 
             // Update only provided optional fields
+            if (updatedInfo.getVehicleType() != null)
+                existing.setVehicleType(updatedInfo.getVehicleType());
+            
             if (updatedInfo.getVehicleNumber() != null)
                 existing.setVehicleNumber(updatedInfo.getVehicleNumber());
 
