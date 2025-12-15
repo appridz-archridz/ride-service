@@ -595,5 +595,121 @@ public class RideServiceImpl implements RideService {
 
         return response;
     }
+    
+    
+    @Override
+    @Transactional
+    public ResponseModel<CreateRide> updateRide(UUID rideId, RideDTO rideDTO) {
+
+        log.info("Updating ride {} for user {}", rideId);
+        ResponseModel<CreateRide> response = new ResponseModel<>();
+
+        try {
+
+            CreateRide existingRide = rideRepository.findById(rideId)
+                    .orElse(null);
+
+            if (existingRide == null) {
+                return createErrorResponse(response, HttpStatus.NOT_FOUND, "Ride not found");
+            }
+
+            // Authorization check
+            // Validate polyline
+            if (rideDTO.getPolyline() == null || rideDTO.getPolyline().isBlank()) {
+                return createErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid path");
+            }
+
+            // Validate coordinates
+            if (!isValidCoordinates(rideDTO.getStartLatitude(), rideDTO.getStartLongitude()) ||
+                !isValidCoordinates(rideDTO.getDestinationLatitude(), rideDTO.getDestinationLongitude())) {
+                return createErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid coordinates provided");
+            }
+
+            // Validate via points
+            if (rideDTO.getViaPoints() != null) {
+                for (var viaPoint : rideDTO.getViaPoints()) {
+                    if (!isValidCoordinates(viaPoint.getPickupLatitude(), viaPoint.getPickupLongitude()) ||
+                        !isValidCoordinates(viaPoint.getDropLatitude(), viaPoint.getDropLongitude())) {
+                        return createErrorResponse(response, HttpStatus.BAD_REQUEST, "Invalid via point coordinates");
+                    }
+                }
+            }
+
+            // Validate minimum distance
+            double tripDistance = haversine(
+                    rideDTO.getStartLatitude(), rideDTO.getStartLongitude(),
+                    rideDTO.getDestinationLatitude(), rideDTO.getDestinationLongitude()
+            );
+
+            if (tripDistance < MIN_TRIP_DISTANCE_KM) {
+                return createErrorResponse(response, HttpStatus.BAD_REQUEST,
+                        String.format("Trip distance too short. Minimum: %.1f km", MIN_TRIP_DISTANCE_KM));
+            }
+
+            // Update fields
+            updateRideFields(existingRide, rideDTO);
+
+            CreateRide updatedRide = rideRepository.save(existingRide);
+
+            response.setStatusCode(String.valueOf(HttpStatus.OK.value()));
+            response.setMessage("Ride updated successfully");
+            response.setData(updatedRide);
+            response.setSuccess(true);
+
+            log.info("Ride updated successfully with ID: {}", updatedRide.getId());
+
+        } catch (Exception e) {
+            log.error("Error updating ride: ", e);
+            return createErrorResponse(response, HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Failed to update ride: " + e.getMessage());
+        }
+
+        return response;
+    }
+    
+    
+    private void updateRideFields(CreateRide ride, RideDTO dto) {
+
+        ride.setStartPoint(dto.getStartPoint());
+        ride.setStartLatitude(dto.getStartLatitude());
+        ride.setStartLongitude(dto.getStartLongitude());
+        ride.setDestinationPoint(dto.getDestinationPoint());
+        ride.setDestinationLatitude(dto.getDestinationLatitude());
+        ride.setDestinationLongitude(dto.getDestinationLongitude());
+        ride.setRideDate(dto.getRideDate());
+        ride.setRideTime(dto.getRideTime());
+        ride.setVehicleId(dto.getVehicleId());
+        ride.setVehicleType(dto.getVehicleType());
+        ride.setAvailableSeats(dto.getAvailableSeats());
+        ride.setPolyline(dto.getPolyline());
+
+        // ✅ FIX for orphanRemoval issue
+        if (dto.getViaPoints() != null) {
+
+            if (ride.getViaPoints() == null) {
+                ride.setViaPoints(new ArrayList<>());
+            }
+
+            // clear existing managed collection
+            ride.getViaPoints().clear();
+
+            // add new via points
+            dto.getViaPoints().forEach(v -> {
+                ride.getViaPoints().add(
+                    ViaPoints.builder()
+                            .pickupLocation(v.getPickupLocation())
+                            .pickupLatitude(v.getPickupLatitude())
+                            .pickupLongitude(v.getPickupLongitude())
+                            .dropLocation(v.getDropLocation())
+                            .dropLatitude(v.getDropLatitude())
+                            .dropLongitude(v.getDropLongitude())
+                            .build()
+                );
+            });
+        }
+    }
+
+
+
 
 }

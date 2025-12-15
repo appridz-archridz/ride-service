@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,17 +40,17 @@ public class RideController {
     private final RideRepository rideRepository;
     private final HttpStatusCode httpStatusCode;
 
-    @PostMapping("/create/{userId}")
-    public ResponseEntity<ResponseModel<CreateRide>> createRide(
-            @PathVariable UUID userId, 
-            @RequestBody RideDTO rideDTO) {
-
-        log.info("Begin RideController -> createRide()");
-        ResponseModel<CreateRide> response = rideService.createRide(rideDTO, userId);
-        HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
-        log.info("End RideController -> createRide()");
-        return ResponseEntity.status(httpStatus).body(response);
-    }
+	    @PostMapping("/create/{userId}")
+	    public ResponseEntity<ResponseModel<CreateRide>> createRide(
+	            @PathVariable UUID userId, 
+	            @RequestBody RideDTO rideDTO) {
+	
+	        log.info("Begin RideController -> createRide()");
+	        ResponseModel<CreateRide> response = rideService.createRide(rideDTO, userId);
+	        HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+	        log.info("End RideController -> createRide()");
+	        return ResponseEntity.status(httpStatus).body(response);
+	    }
     
     @PostMapping("/search")
     public ResponseEntity<ResponseModel<List<CreateRide>>> searchRides(@RequestBody SearchRideDTO searchRideDTO) {
@@ -103,6 +104,19 @@ public class RideController {
         log.info("End RideController -> getRidesByUser()");
         return ResponseEntity.status(httpStatus).body(response);
     }
+    
+    @PutMapping("/update/{rideId}")
+    public ResponseEntity<ResponseModel<CreateRide>> updateRide(
+            @PathVariable UUID rideId,
+            @RequestBody RideDTO rideDTO) {
+
+        log.info("Begin RideController -> updateRide()");
+        ResponseModel<CreateRide> response = rideService.updateRide(rideId, rideDTO);
+        HttpStatus httpStatus = httpStatusCode.getHttpStatusFromCode(response.getStatusCode());
+        log.info("End RideController -> updateRide()");
+        return ResponseEntity.status(httpStatus).body(response);
+    }
+
     
 
      
